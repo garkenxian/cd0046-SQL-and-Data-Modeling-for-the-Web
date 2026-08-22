@@ -1,7 +1,8 @@
 """Tests for Fyyur models."""
 
 import pytest
-from app import app, db, Venue, Artist
+from datetime import datetime
+from app import app, db, Venue, Artist, Show
 
 
 class TestVenueModel:
@@ -71,3 +72,46 @@ class TestArtistModel:
             retrieved = Artist.query.filter_by(name='Retrieve Test Artist').first()
             assert retrieved is not None
             assert retrieved.name == 'Retrieve Test Artist'
+
+
+class TestShowModel:
+    """Test cases for the Show model."""
+
+    def test_show_creation(self, client):
+        """Test creating a new show."""
+        with app.app_context():
+            venue = Venue(name='Show Venue', city='City', state='ST')
+            artist = Artist(name='Show Artist', city='City', state='ST')
+            db.session.add_all([venue, artist])
+            db.session.commit()
+
+            show = Show(
+                venue_id=venue.id,
+                artist_id=artist.id,
+                start_time=datetime(2024, 6, 1, 20, 0, 0)
+            )
+            db.session.add(show)
+            db.session.commit()
+
+            assert show.id is not None
+            assert show.venue_id == venue.id
+            assert show.artist_id == artist.id
+
+    def test_show_relationships(self, client):
+        """Test that Show has proper relationships to Venue and Artist."""
+        with app.app_context():
+            venue = Venue(name='Rel Venue', city='City', state='ST')
+            artist = Artist(name='Rel Artist', city='City', state='ST')
+            db.session.add_all([venue, artist])
+            db.session.commit()
+
+            show = Show(
+                venue_id=venue.id,
+                artist_id=artist.id,
+                start_time=datetime(2024, 7, 4, 21, 0, 0)
+            )
+            db.session.add(show)
+            db.session.commit()
+
+            assert show in venue.shows
+            assert show in artist.shows
