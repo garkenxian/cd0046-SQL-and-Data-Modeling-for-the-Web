@@ -9,7 +9,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     nodejs \
     npm \
-    && rm -rf /var/lib/apt/lists/*
+    make \
+    && rm -rf /var/lib/apt/lists/* 
 
 # Install Python dependencies
 COPY requirements.txt /workspace/
