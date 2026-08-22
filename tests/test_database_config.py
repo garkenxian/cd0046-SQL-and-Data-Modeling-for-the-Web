@@ -1,10 +1,8 @@
 """Tests for database configuration and Flask-Migrate setup."""
 
-import pytest
 import os
 from sqlalchemy import text
 from app import app, db, Venue, Artist
-from flask_migrate import Migrate
 
 
 class TestDatabaseConfiguration:
