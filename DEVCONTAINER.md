@@ -68,11 +68,11 @@ flask db downgrade
 psql -h postgres -U postgres -d fyyur
 
 # View PostgreSQL logs
-docker-compose logs postgres
+docker-compose -f .devcontainer/docker-compose.yml logs postgres
 
 # Reset everything (warning: deletes database)
-docker-compose down -v
-docker-compose up
+docker-compose -f .devcontainer/docker-compose.yml down -v
+docker-compose -f .devcontainer/docker-compose.yml up
 ```
 
 ## Database Access
