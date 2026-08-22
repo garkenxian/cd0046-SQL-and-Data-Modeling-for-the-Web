@@ -1,6 +1,6 @@
 {
   "name": "Fyyur Dev Environment",
-  "dockerComposeFile": "../docker-compose.yml",
+  "dockerComposeFile": "docker-compose.yml",
   "service": "web",
   "workspaceFolder": "/workspace",
   
