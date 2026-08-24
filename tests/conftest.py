@@ -2,7 +2,8 @@
 
 import os
 import pytest
-from app import app, db
+from app import app
+from dal import db
 
 
 @pytest.fixture

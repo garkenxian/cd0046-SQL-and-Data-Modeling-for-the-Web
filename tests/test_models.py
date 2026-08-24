@@ -1,7 +1,8 @@
 """Tests for Fyyur models."""
 
 import pytest
-from app import app, db, Venue, Artist
+from app import app
+from dal import db, Venue, Artist
 
 
 class TestVenueModel:

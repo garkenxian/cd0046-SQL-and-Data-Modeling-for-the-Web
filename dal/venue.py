@@ -1,0 +1,21 @@
+"""
+Venue model - part of the Data Access Layer.
+Represents venue entities in the database.
+"""
+
+from dal import db
+
+class Venue(db.Model):
+    __tablename__ = 'venue'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String)
+    city = db.Column(db.String(120))
+    state = db.Column(db.String(120))
+    address = db.Column(db.String(120))
+    phone = db.Column(db.String(30))
+    image_link = db.Column(db.String)
+    facebook_link = db.Column(db.String)
+    website = db.Column(db.String)
+
+    # TODO: implement any missing fields, as a database migration using Flask-Migrate
