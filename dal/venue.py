@@ -5,6 +5,7 @@ Represents venue entities in the database.
 
 from dal import db
 
+
 class Venue(db.Model):
     __tablename__ = 'venue'
 
@@ -17,5 +18,11 @@ class Venue(db.Model):
     image_link = db.Column(db.String)
     facebook_link = db.Column(db.String)
     website = db.Column(db.String)
+    seeking_talent = db.Column(db.Boolean, default=False)
+    seeking_description = db.Column(db.String)
 
-    # TODO: implement any missing fields, as a database migration using Flask-Migrate
+    # Many-to-many relationship with Genre through venue_genre junction table
+    genres = db.relationship(
+        'Genre',
+        secondary='venue_genre'
+    )

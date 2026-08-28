@@ -1,7 +1,10 @@
 """
 Business logic layer for venue-related operations.
 """
+from datetime import datetime
 from dal.venue import Venue
+from dal.show import Show
+from dal.artist import Artist
 from dto.venue import VenueDTO
 from dal import db
 
@@ -17,9 +20,8 @@ class VenueService():
             "venues": [{"id": 1, "name": "...", "num_upcoming_shows": 0}, ...]
         }, ...]
         """
-        # TODO: num_upcoming_shows should be aggregated based on number of upcoming shows per venue.
-        
         venues = Venue.query.all()
+        now = datetime.now()
         
         # Group venues by city and state
         grouped = {}
@@ -32,11 +34,19 @@ class VenueService():
         # Transform into expected format
         data = []
         for (city, state), venue_list in grouped.items():
-            venues_formatted = [{
-                "id": v.id,
-                "name": v.name,
-                "num_upcoming_shows": 0  # TODO: count upcoming shows when Show model is available
-            } for v in venue_list]
+            venues_formatted = []
+            for v in venue_list:
+                # Count upcoming shows for this venue
+                num_upcoming_shows = Show.query.filter(
+                    Show.venue_id == v.id,
+                    Show.start_time >= now
+                ).count()
+                
+                venues_formatted.append({
+                    "id": v.id,
+                    "name": v.name,
+                    "num_upcoming_shows": num_upcoming_shows
+                })
             
             data.append({
                 "city": city,
@@ -48,117 +58,158 @@ class VenueService():
 
     @staticmethod
     def show_venue_by_venue_id(venue_id):
-        data1={
-            "id": 1,
-            "name": "The Musical Hop",
-            "genres": ["Jazz", "Reggae", "Swing", "Classical", "Folk"],
-            "address": "1015 Folsom Street",
-            "city": "San Francisco",
-            "state": "CA",
-            "phone": "123-123-1234",
-            "website": "https://www.themusicalhop.com",
-            "facebook_link": "https://www.facebook.com/TheMusicalHop",
-            "seeking_talent": True,
-            "seeking_description": "We are on the lookout for a local artist to play every two weeks. Please call us.",
-            "image_link": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60",
-            "past_shows": [{
-                "artist_id": 4,
-                "artist_name": "Guns N Petals",
-                "artist_image_link": "https://images.unsplash.com/photo-1549213783-8284d0336c4f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=300&q=80",
-                "start_time": "2019-05-21T21:30:00.000Z"
-            }],
-            "upcoming_shows": [],
-            "past_shows_count": 1,
-            "upcoming_shows_count": 0,
+        """Get venue details by ID with past and upcoming shows.
+        
+        Returns venue data with all fields, shows separated by date.
+        """
+        venue = Venue.query.get(venue_id)
+        
+        if not venue:
+            return None
+        
+        # Query all shows for this venue
+        shows = Show.query.filter_by(venue_id=venue_id).all()
+        
+        now = datetime.now()
+        past_shows = []
+        upcoming_shows = []
+        
+        for show in shows:
+            # Get artist info
+            artist = Artist.query.get(show.artist_id)
+            if not artist:
+                continue
+            
+            show_data = {
+                "artist_id": artist.id,
+                "artist_name": artist.name,
+                "artist_image_link": artist.image_link,
+                "start_time": show.start_time.isoformat()
             }
-        data2={
-            "id": 2,
-            "name": "The Dueling Pianos Bar",
-            "genres": ["Classical", "R&B", "Hip-Hop"],
-            "address": "335 Delancey Street",
-            "city": "New York",
-            "state": "NY",
-            "phone": "914-003-1132",
-            "website": "https://www.theduelingpianos.com",
-            "facebook_link": "https://www.facebook.com/theduelingpianos",
-            "seeking_talent": False,
-            "image_link": "https://images.unsplash.com/photo-1497032205916-ac775f0649ae?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=750&q=80",
-            "past_shows": [],
-            "upcoming_shows": [],
-            "past_shows_count": 0,
-            "upcoming_shows_count": 0,
-            }
-        data3={
-            "id": 3,
-            "name": "Park Square Live Music & Coffee",
-            "genres": ["Rock n Roll", "Jazz", "Classical", "Folk"],
-            "address": "34 Whiskey Moore Ave",
-            "city": "San Francisco",
-            "state": "CA",
-            "phone": "415-000-1234",
-            "website": "https://www.parksquarelivemusicandcoffee.com",
-            "facebook_link": "https://www.facebook.com/ParkSquareLiveMusicAndCoffee",
-            "seeking_talent": False,
-            "image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
-            "past_shows": [{
-                "artist_id": 5,
-                "artist_name": "Matt Quevedo",
-                "artist_image_link": "https://images.unsplash.com/photo-1495223153807-b916f75de8c5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=334&q=80",
-                "start_time": "2019-06-15T23:00:00.000Z"
-            }],
-            "upcoming_shows": [{
-                "artist_id": 6,
-                "artist_name": "The Wild Sax Band",
-                "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-                "start_time": "2035-04-01T20:00:00.000Z"
-            }, {
-                "artist_id": 6,
-                "artist_name": "The Wild Sax Band",
-                "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-                "start_time": "2035-04-08T20:00:00.000Z"
-            }, {
-                "artist_id": 6,
-                "artist_name": "The Wild Sax Band",
-                "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-                "start_time": "2035-04-15T20:00:00.000Z"
-            }],
-            "past_shows_count": 1,
-            "upcoming_shows_count": 1,
-            }
-        data = list(filter(lambda d: d['id'] == venue_id, [data1, data2, data3]))[0]
-        return data
+            
+            if show.start_time < now:
+                past_shows.append(show_data)
+            else:
+                upcoming_shows.append(show_data)
+        
+        # Build venue response - convert genres relationship to list of names
+        genres = [g.name for g in venue.genres]
+        
+        return {
+            "id": venue.id,
+            "name": venue.name,
+            "genres": genres,
+            "address": venue.address,
+            "city": venue.city,
+            "state": venue.state,
+            "phone": venue.phone,
+            "website": venue.website,
+            "facebook_link": venue.facebook_link,
+            "seeking_talent": venue.seeking_talent,
+            "seeking_description": venue.seeking_description,
+            "image_link": venue.image_link,
+            "past_shows": past_shows,
+            "upcoming_shows": upcoming_shows,
+            "past_shows_count": len(past_shows),
+            "upcoming_shows_count": len(upcoming_shows),
+        }
 
     @staticmethod
     def search_venue_by_name(search_term):
-
-        # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
-        # seach for Hop should return "The Musical Hop".
-        # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
-
-        st = search_term
-
+        """Search venues by name (case-insensitive, partial string match).
+        
+        Returns matching venues with upcoming shows count.
+        """
+        # Query venues where name contains search_term (case-insensitive)
+        venues = Venue.query.filter(
+            Venue.name.ilike(f'%{search_term}%')
+        ).all()
+        
+        results = []
+        now = datetime.now()
+        
+        for venue in venues:
+            # Count upcoming shows for this venue
+            upcoming_shows = Show.query.filter(
+                Show.venue_id == venue.id,
+                Show.start_time >= now
+            ).count()
+            
+            results.append({
+                "id": venue.id,
+                "name": venue.name,
+                "num_upcoming_shows": upcoming_shows,
+            })
+        
         return {
-            "count": 1,
-            "data": [
-                {
-                    "id": 2,
-                    "name": "The Dueling Pianos Bar",
-                    "num_upcoming_shows": 0,
-                }
-            ]
+            "count": len(results),
+            "data": results
         }
 
+    @staticmethod
     def validate_venue_form_data(form_data):
         validation_error = None
-        data = VenueDTO(
-            name = form_data['name']
-        )
-        ## return validation_error, data
-        return validation_error, data
+        try:
+            genres = form_data.getlist('genres') if hasattr(form_data, 'getlist') else []
+            
+            # Extract seeking_talent (WTForms sends 'y' for checked, nothing for unchecked)
+            seeking_talent = form_data.get('seeking_talent') == 'y'
+            seeking_description = form_data.get('seeking_description', '')
+            
+            data = VenueDTO(
+                id=None,
+                name=form_data['name'],
+                city=form_data['city'],
+                state=form_data['state'],
+                address=form_data['address'],
+                phone=form_data['phone'],
+                image_link=form_data['image_link'],
+                facebook_link=form_data['facebook_link'],
+                website=form_data.get('website_link', ''),
+                seeking_talent=seeking_talent,
+                seeking_description=seeking_description,
+                genres=genres
+            )
+            return validation_error, data
+        except (KeyError, AttributeError) as e:
+            validation_error = f"Missing required field: {str(e)}"
+            return validation_error, None
 
     @staticmethod
-    def create_venue(venue_dto:VenueDTO):
-        return True, None
+    def create_venue(venue_dto: VenueDTO):
+        """Create a new venue in the database.
+        
+        Returns (success, error_message)
+        """
+        try:
+            venue = Venue(
+                name=venue_dto.name,
+                city=venue_dto.city,
+                state=venue_dto.state,
+                address=venue_dto.address,
+                phone=venue_dto.phone,
+                image_link=venue_dto.image_link,
+                facebook_link=venue_dto.facebook_link,
+                website=venue_dto.website,
+                seeking_talent=venue_dto.seeking_talent,
+                seeking_description=venue_dto.seeking_description
+            )
+            
+            # Link genres to venue from venue_dto.genres (genre names)
+            from dal.genre import Genre
+            if venue_dto.genres:
+                for genre_name in venue_dto.genres:
+                    genre = Genre.query.filter_by(name=genre_name).first()
+                    if genre:
+                        venue.genres.append(genre)
+            
+            db.session.add(venue)
+            db.session.commit()
+            
+            return True, None
+        except Exception as e:
+            db.session.rollback()
+            return False, str(e)
 
     @staticmethod
     def update_venue(venue_id:int, venue_dto:VenueDTO):
@@ -170,19 +221,50 @@ class VenueService():
             
             # Update venue fields
             venue.name = venue_dto.name
-            # TODO: Update other fields when DTO is fully implemented
+            venue.city = venue_dto.city
+            venue.state = venue_dto.state
+            venue.address = venue_dto.address
+            venue.phone = venue_dto.phone
+            venue.image_link = venue_dto.image_link
+            venue.facebook_link = venue_dto.facebook_link
+            venue.website = venue_dto.website
+            venue.seeking_talent = venue_dto.seeking_talent
+            venue.seeking_description = venue_dto.seeking_description
+            
+            # Update genres relationship from venue_dto.genres
+            from dal.genre import Genre
+            if venue_dto.genres is not None:
+                # Clear existing genres
+                venue.genres.clear()
+                # Add new genres
+                for genre_name in venue_dto.genres:
+                    genre = Genre.query.filter_by(name=genre_name).first()
+                    if genre:
+                        venue.genres.append(genre)
             
             # Commit changes
             db.session.commit()
             
             return True, None
         except Exception as e:
-            from dal import db
             db.session.rollback()
             return False, str(e)
 
     @staticmethod
-    def delete_venue(venue_id:any):
-        # TODO: Complete this endpoint for taking a venue_id, and using
-        # SQLAlchemy ORM to delete a record. Handle cases where the session commit could fail.
-        return True
+    def delete_venue(venue_id: int):
+        """Delete a venue from the database.
+        
+        Returns success status.
+        """
+        try:
+            venue = Venue.query.get(venue_id)
+            if not venue:
+                return False
+            
+            db.session.delete(venue)
+            db.session.commit()
+            
+            return True
+        except Exception as e:
+            db.session.rollback()
+            return False

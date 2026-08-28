@@ -1,4 +1,4 @@
-.PHONY: help install run test test-cov lint db-init db-migrate db-upgrade db-reset clean
+.PHONY: help install run test test-cov lint db-init db-migrate db-upgrade db-reset db-seed db-refresh clean
 
 help:
 	@echo "Fyyur Development Commands"
@@ -16,11 +16,13 @@ help:
 	@echo "Code Quality:"
 	@echo "  make lint             Run flake8 linter"
 	@echo ""
-	@echo "Database:"
+	@echo "Database (PostgreSQL):"
 	@echo "  make db-init          Initialize database (create tables)"
-	@echo "  make db-migrate       Create a new database migration"
-	@echo "  make db-upgrade       Apply pending migrations"
 	@echo "  make db-reset         Reset database (drop and recreate all tables)"
+	@echo "  make db-seed          Seed database with sample data"
+	@echo "  make db-refresh       Reset and seed database (combine reset + seed)"
+	@echo "  make db-migrate       Create a new database migration (Flask-Migrate)"
+	@echo "  make db-upgrade       Apply pending migrations (Flask-Migrate)"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean            Remove generated files and caches"
@@ -44,7 +46,7 @@ lint:
 	flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
 db-init:
-	python -c "from app import db, app; app.app_context().push(); db.create_all(); print('Database initialized!')"
+	python -c "from app import app; from dal import db; ctx = app.app_context(); ctx.push(); db.create_all(); print('✅ Database initialized!')"
 
 db-migrate:
 	flask db migrate
@@ -53,7 +55,13 @@ db-upgrade:
 	flask db upgrade
 
 db-reset:
-	python -c "from app import db, app; app.app_context().push(); db.drop_all(); db.create_all(); print('Database reset!')"
+	python -c "from app import app; from dal import db; ctx = app.app_context(); ctx.push(); db.drop_all(); db.create_all(); print('✅ Database reset!')"
+
+db-seed:
+	python -c "from app import app; from dal import db; from test_helpers.seed import seed_database; ctx = app.app_context(); ctx.push(); seed_database(); print('✅ Database seeded with sample data!')"
+
+db-refresh: db-reset db-seed
+	@echo "✅ Database refreshed!"
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

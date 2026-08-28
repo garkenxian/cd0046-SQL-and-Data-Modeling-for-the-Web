@@ -1,31 +1,68 @@
+#TODO: Search that is empty needs to show an error and then return to the referrer
+
 from flask import Blueprint, render_template, request, flash, redirect, url_for
 from forms import VenueForm
 from services.venue import VenueService
 
 venue_bp = Blueprint('venues', __name__, url_prefix='/venues')
 
+# GET /venues
 @venue_bp.route('/', strict_slashes=False)
 def venues():
+    """Display all venues grouped by city and state.
+    
+    Returns a page with venues organized by location.
+    """
     data = VenueService.get_venues_grouped_by_location()
     return render_template('pages/venues.html', areas=data)
 
+# POST /venues/search
 @venue_bp.route('/search', methods=['POST'])
 def search_venues():
-    response = VenueService.search_venue_by_name(request.form.get('search_term', ''))
-    return render_template('pages/search_venues.html', results=response, search_term=request.form.get('search_term', ''))
+    """Search venues by name.
+    
+    Accepts a search term from form data and returns matching venues.
+    Returns the search results page with the search term and results.
+    """
+    search_term = request.form.get('search_term', '').strip()
+    
+    if not search_term:
+        flash("Please enter a valid search term", category='error')
+        return redirect(request.referrer or url_for('venues.venues'))
+    
+    response = VenueService.search_venue_by_name(search_term=search_term)
+    return render_template('pages/search_venues.html', results=response, search_term=search_term)
 
+# GET /venues/:venue_id
 @venue_bp.route('/<int:venue_id>')
 def show_venue(venue_id):
+    """Display details for a specific venue.
+    
+    Takes venue_id as URL parameter and returns the venue detail page
+    with all information about that venue.
+    """
     data = VenueService.show_venue_by_venue_id(venue_id=venue_id)
     return render_template('pages/show_venue.html', venue=data)
 
+# GET /venues/create 
 @venue_bp.route('/create', methods=['GET'])
 def create_venue_form():
+    """Display the form to create a new venue.
+    
+    Returns a blank form that users can fill out to create a new venue.
+    """
     form = VenueForm()
-    return render_template('forms/new_venue.html', form=form)
+    return render_template('forms/new_venue.html', form=form, data={})
 
+
+# POST /venues/create
 @venue_bp.route('/create', methods=['POST'])
 def create_venue_submission():
+    """Handle venue creation form submission.
+    
+    Validates the form data, creates the venue in the database,
+    and redirects to the venues list on success or redisplays the form on error.
+    """
     form = VenueForm()
     validation_error, venue_data = VenueService.validate_venue_form_data(request.form)
     
@@ -42,8 +79,14 @@ def create_venue_submission():
         flash(f"Venue could not be listed: {venue_fail_reason}", category='error')
         return render_template('forms/new_venue.html', form=form, error=venue_fail_reason, data=request.form)
 
+# DELETE /venues/:venue_id
 @venue_bp.route('/<int:venue_id>', methods=['DELETE'])
 def delete_venue(venue_id):
+    """Delete a venue by its ID.
+    
+    Takes venue_id as URL parameter and deletes that venue from the database.
+    Returns a JSON response with success or failure status.
+    """
     result = VenueService.delete_venue(venue_id=venue_id)  
 
     if result:
@@ -51,8 +94,14 @@ def delete_venue(venue_id):
     else:
         return {'success': False, 'message': 'Unable to delete venue'}, 400
 
+# GET /venues/:venue_id/edit
 @venue_bp.route('/<int:venue_id>/edit', methods=['GET'])
 def edit_venue(venue_id):
+    """Display the form to edit an existing venue.
+    
+    Takes venue_id as URL parameter, fetches the venue data from the database,
+    and returns a form pre-populated with the current venue information.
+    """
     # Loads the Venue Data to edit
     form = VenueForm()
     data = VenueService.show_venue_by_venue_id(venue_id=venue_id)
@@ -72,14 +121,23 @@ def edit_venue(venue_id):
     
     return render_template('forms/edit_venue.html', form=form, venue=data)
 
+# POST /venues/:venue_id/edit
 @venue_bp.route('/<int:venue_id>/edit', methods=['POST'])
 def edit_venue_submission(venue_id):
+    """Handle venue edit form submission.
+    
+    Takes venue_id as URL parameter, validates the submitted form data,
+    updates the venue in the database, and redirects on success
+    or redisplays the form on error.
+    """
     form = VenueForm()
+    venue = VenueService.show_venue_by_venue_id(venue_id=venue_id)
+    
     validation_error, venue_data = VenueService.validate_venue_form_data(request.form)
     
     if validation_error:
         flash(f"Form validation failed: {validation_error}", category='error')
-        return render_template('forms/edit_venue.html', form=form, error=validation_error, data=request.form)
+        return render_template('forms/edit_venue.html', form=form, venue=venue, error=validation_error)
     
     venue_edit_success, venue_fail_reason = VenueService.update_venue(venue_id, venue_data)
     
@@ -88,5 +146,5 @@ def edit_venue_submission(venue_id):
         return redirect(url_for('venues.show_venue', venue_id=venue_id))
     else:
         flash(f"Venue could not be updated: {venue_fail_reason}", category='error')
-        return render_template('forms/edit_venue.html', form=form, error=venue_fail_reason, data=request.form)
+        return render_template('forms/edit_venue.html', form=form, venue=venue, error=venue_fail_reason)
 

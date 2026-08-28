@@ -1,64 +1,184 @@
-from flask import Blueprint, render_template, flash
+from flask import Blueprint, render_template, request, flash, redirect, url_for
 from forms import ShowForm
+from services.show import ShowService
+from dal import Venue, Artist
+from datetime import datetime
 
 show_bp = Blueprint('shows', __name__, url_prefix='/shows')
 
+# GET /shows
 @show_bp.route('/', strict_slashes=False)
 def shows():
-    # displays list of shows at /shows
-    # TODO: replace with real venues data.
-    data=[{
-        "venue_id": 1,
-        "venue_name": "The Musical Hop",
-        "artist_id": 4,
-        "artist_name": "Guns N Petals",
-        "artist_image_link": "https://images.unsplash.com/photo-1549213783-8284d0336c4f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=300&q=80",
-        "start_time": "2019-05-21T21:30:00.000Z"
-    }, {
-        "venue_id": 3,
-        "venue_name": "Park Square Live Music & Coffee",
-        "artist_id": 5,
-        "artist_name": "Matt Quevedo",
-        "artist_image_link": "https://images.unsplash.com/photo-1495223153807-b916f75de8c5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=334&q=80",
-        "start_time": "2019-06-15T23:00:00.000Z"
-    }, {
-        "venue_id": 3,
-        "venue_name": "Park Square Live Music & Coffee",
-        "artist_id": 6,
-        "artist_name": "The Wild Sax Band",
-        "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-        "start_time": "2035-04-01T20:00:00.000Z"
-    }, {
-        "venue_id": 3,
-        "venue_name": "Park Square Live Music & Coffee",
-        "artist_id": 6,
-        "artist_name": "The Wild Sax Band",
-        "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-        "start_time": "2035-04-08T20:00:00.000Z"
-    }, {
-        "venue_id": 3,
-        "venue_name": "Park Square Live Music & Coffee",
-        "artist_id": 6,
-        "artist_name": "The Wild Sax Band",
-        "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-        "start_time": "2035-04-15T20:00:00.000Z"
-    }]
+    """Display all shows.
+    
+    Returns a page with all shows in the database.
+    """
+    data = ShowService.get_all_shows()
     return render_template('pages/shows.html', shows=data)
 
-@show_bp.route('/create')
-def create_shows():
-    # renders form. do not touch.
-    form = ShowForm()
-    return render_template('forms/new_show.html', form=form)
+# POST /shows/search
+@show_bp.route('/search', methods=['POST'])
+def search_shows():
+    """Search shows by artist and/or venue.
+    
+    Accepts search parameters from form data and returns matching shows.
+    Returns the search results page with the results.
+    """
+    artist_id = request.form.get('artist_id', '').strip()
+    venue_id = request.form.get('venue_id', '').strip()
+    
+    if not artist_id and not venue_id:
+        flash("Please enter a valid search term", category='error')
+        return redirect(request.referrer or url_for('shows.shows'))
+    
+    response_data = ShowService.search_show_by_artist_and_venue(
+        artist_id=int(artist_id) if artist_id else None,
+        venue_id=int(venue_id) if venue_id else None
+    )
+    return render_template('pages/search_shows.html', results={"data": response_data, "count": len(response_data)})
 
+# GET /shows/:show_id
+@show_bp.route('/<int:show_id>')
+def show_show(show_id):
+    """Display details for a specific show.
+    
+    Takes show_id as URL parameter and returns the show detail page
+    with all information about that show. Redirects back if show not found.
+    """
+    data = ShowService.show_show_by_show_id(show_id=show_id)
+    
+    if not data:
+        flash(f"Show with ID {show_id} not found", category='error')
+        return redirect(request.referrer or url_for('shows.shows'))
+    
+    return render_template('pages/show.html', show=data)
+
+# GET /shows/create
+@show_bp.route('/create', methods=['GET'])
+def create_show_form():
+    """Display the form to create a new show.
+    
+    Returns the show creation form for user to fill out.
+    """
+    form = ShowForm()
+    # Populate dropdowns with available venues and artists
+    venues = Venue.query.all()
+    artists = Artist.query.all()
+    
+    form.venue_id.choices = [(v.id, f"{v.name} ({v.city}, {v.state})") for v in venues]
+    form.artist_id.choices = [(a.id, f"{a.name}") for a in artists]
+    
+    return render_template('forms/new_show.html', form=form, data={}, now=datetime.now())
+
+# POST /shows/create
 @show_bp.route('/create', methods=['POST'])
 def create_show_submission():
-    # called to create new shows in the db, upon submitting new show listing form
-    # TODO: insert form data as a new Show record in the db, instead
+    """Handle show creation form submission.
+    
+    Validates the form data, creates the show in the database,
+    and redirects to the shows list on success or redisplays the form on error.
+    """
+    form = ShowForm()
+    # Populate dropdowns for re-rendering if validation fails
+    venues = Venue.query.all()
+    artists = Artist.query.all()
+    form.venue_id.choices = [(v.id, f"{v.name} ({v.city}, {v.state})") for v in venues]
+    form.artist_id.choices = [(a.id, f"{a.name}") for a in artists]
+    
+    validation_error, show_data = ShowService.validate_show_form_data(request.form)
+    
+    if validation_error:
+        flash(f"Form validation failed: {validation_error}", category='error')
+        return render_template('forms/new_show.html', form=form, error=validation_error, data=request.form, now=datetime.now())
+    
+    show_create_success, show_fail_reason = ShowService.create_show(show_data)
+    
+    if show_create_success:
+        flash(f"Show was successfully listed!", category='success')
+        return redirect(url_for('shows.shows', _external=False))
+    else:
+        flash(f"Show could not be listed: {show_fail_reason}", category='error')
+        return render_template('forms/new_show.html', form=form, error=show_fail_reason, data=request.form, now=datetime.now())
 
-    # on successful db insert, flash success
-    flash('Show was successfully listed!')
-    # TODO: on unsuccessful db insert, flash an error instead.
-    # e.g., flash('An error occurred. Show could not be listed.')
-    # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
-    return render_template('pages/home.html')
+# GET /shows/:show_id/edit
+@show_bp.route('/<int:show_id>/edit', methods=['GET'])
+def edit_show(show_id):
+    """Display the form to edit an existing show.
+    
+    Takes show_id as URL parameter, fetches the show data from the database,
+    and returns a form pre-populated with the current show information.
+    """
+    form = ShowForm()
+    data = ShowService.show_show_by_show_id(show_id=show_id)
+    
+    if not data:
+        flash(f"Show with ID {show_id} not found", category='error')
+        return redirect(request.referrer or url_for('shows.shows'))
+    
+    # Populate dropdowns
+    venues = Venue.query.all()
+    artists = Artist.query.all()
+    form.venue_id.choices = [(v.id, f"{v.name} ({v.city}, {v.state})") for v in venues]
+    form.artist_id.choices = [(a.id, f"{a.name}") for a in artists]
+    
+    # Populate form with show data
+    form.venue_id.data = data.get('venue_id')
+    form.artist_id.data = data.get('artist_id')
+    # Convert ISO format string to datetime object
+    start_time_str = data.get('start_time')
+    if start_time_str:
+        form.start_time.data = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+    
+    return render_template('forms/edit_show.html', form=form, show=data)
+
+# POST /shows/:show_id/edit
+@show_bp.route('/<int:show_id>/edit', methods=['POST'])
+def edit_show_submission(show_id):
+    """Handle show edit form submission.
+    
+    Takes show_id as URL parameter, validates the submitted form data,
+    updates the show in the database, and redirects on success
+    or redisplays the form on error.
+    """
+    form = ShowForm()
+    show = ShowService.show_show_by_show_id(show_id=show_id)
+    
+    if not show:
+        flash(f"Show with ID {show_id} not found", category='error')
+        return redirect(request.referrer or url_for('shows.shows'))
+    
+    # Populate dropdowns for re-rendering if validation fails
+    venues = Venue.query.all()
+    artists = Artist.query.all()
+    form.venue_id.choices = [(v.id, f"{v.name} ({v.city}, {v.state})") for v in venues]
+    form.artist_id.choices = [(a.id, f"{a.name}") for a in artists]
+    
+    validation_error, show_data = ShowService.validate_show_form_data(request.form)
+    
+    if validation_error:
+        flash(f"Form validation failed: {validation_error}", category='error')
+        return render_template('forms/edit_show.html', form=form, show=show, error=validation_error)
+    
+    show_edit_success, show_fail_reason = ShowService.update_show(show_id, show_data)
+    
+    if show_edit_success:
+        flash(f"Show was successfully updated!", category='success')
+        return redirect(url_for('shows.show_show', show_id=show_id))
+    else:
+        flash(f"Show could not be updated: {show_fail_reason}", category='error')
+        return render_template('forms/edit_show.html', form=form, show=show, error=show_fail_reason)
+
+# DELETE /shows/:show_id
+@show_bp.route('/<int:show_id>', methods=['DELETE'])
+def delete_show(show_id):
+    """Delete a show by its ID.
+    
+    Takes show_id as URL parameter and deletes that show from the database.
+    Returns a JSON response with success or failure status.
+    """
+    result = ShowService.delete_show(show_id=show_id)
+
+    if result:
+        return {'success': True, 'message': 'Show deleted successfully!'}, 200
+    else:
+        return {'success': False, 'message': 'Unable to delete show'}, 400
