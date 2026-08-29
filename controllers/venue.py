@@ -3,6 +3,7 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for
 from forms import VenueForm
 from services.venue import VenueService
+from forms_constants import STATE_CHOICES, GENRE_CHOICES
 
 venue_bp = Blueprint('venues', __name__, url_prefix='/venues')
 
@@ -14,24 +15,51 @@ def venues():
     Returns a page with venues organized by location.
     """
     data = VenueService.get_venues_grouped_by_location()
-    return render_template('pages/venues.html', areas=data)
+    return render_template('pages/venues.html', areas=data, states=STATE_CHOICES, genres=GENRE_CHOICES)
 
 # POST /venues/search
 @venue_bp.route('/search', methods=['POST'])
 def search_venues():
-    """Search venues by name.
+    """Search venues by name, city, state, and/or genres.
     
-    Accepts a search term from form data and returns matching venues.
-    Returns the search results page with the search term and results.
+    Accepts search_term, city, state, and genres from form data and returns matching venues.
+    Returns the search results page with the search criteria and results.
     """
     search_term = request.form.get('search_term', '').strip()
+    city = request.form.get('city', '').strip()
+    state = request.form.get('state', '').strip()
+    genres = request.form.getlist('genres')
     
-    if not search_term:
-        flash("Please enter a valid search term", category='error')
+    # If no search criteria provided, show error
+    if not search_term and not city and not state and not genres:
+        flash("Please enter a search term, city, state, or select genres", category='error')
         return redirect(request.referrer or url_for('venues.venues'))
     
-    response = VenueService.search_venue_by_name(search_term=search_term)
-    return render_template('pages/search_venues.html', results=response, search_term=search_term)
+    # If search term provided, search by name
+    if search_term:
+        response = VenueService.search_venue_by_name(search_term=search_term)
+        search_label = f'"{search_term}"'
+    # Otherwise search by city/state/genres
+    else:
+        response = VenueService.search_venue_by_location(city=city, state=state, genres=genres)
+        location_parts = []
+        if city:
+            location_parts.append(city)
+        if state:
+            location_parts.append(state)
+        if genres:
+            location_parts.append(f"{len(genres)} genre(s)")
+        search_label = ', '.join(location_parts)
+    
+    return render_template('pages/search_venues.html', 
+                         results=response, 
+                         search_term=search_term,
+                         city=city,
+                         state=state,
+                         genres=genres,
+                         search_label=search_label,
+                         states=STATE_CHOICES,
+                         genre_choices=GENRE_CHOICES)
 
 # GET /venues/:venue_id
 @venue_bp.route('/<int:venue_id>')

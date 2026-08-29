@@ -2,6 +2,7 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for
 from forms import ArtistForm
 from services.artist import ArtistService
+from forms_constants import STATE_CHOICES, GENRE_CHOICES
 
 artist_bp = Blueprint('artists', __name__, url_prefix='/artists')
 
@@ -13,24 +14,51 @@ def artists():
     Returns a page with all artists in the database.
     """
     data = ArtistService.get_all_artists()
-    return render_template('pages/artists.html', artists=data)
+    return render_template('pages/artists.html', artists=data, states=STATE_CHOICES, genres=GENRE_CHOICES)
 
 # POST /artists/search
 @artist_bp.route('/search', methods=['POST'])
 def search_artists():
-    """Search artists by name.
+    """Search artists by name, city, state, and/or genres.
     
-    Accepts a search term from form data and returns matching artists.
-    Returns the search results page with the search term and results.
+    Accepts search_term, city, state, and genres from form data and returns matching artists.
+    Returns the search results page with the search criteria and results.
     """
     search_term = request.form.get('search_term', '').strip()
-
-    if not search_term:
-        flash("Please enter a valid search term", category='error')
+    city = request.form.get('city', '').strip()
+    state = request.form.get('state', '').strip()
+    genres = request.form.getlist('genres')
+    
+    # If no search criteria provided, show error
+    if not search_term and not city and not state and not genres:
+        flash("Please enter a search term, city, state, or select genres", category='error')
         return redirect(request.referrer or url_for('artists.artists'))
     
-    response = ArtistService.search_artist_by_name(search_term=search_term)
-    return render_template('pages/search_artists.html', results=response, search_term=search_term)
+    # If search term provided, search by name
+    if search_term:
+        response = ArtistService.search_artist_by_name(search_term=search_term)
+        search_label = f'"{search_term}"'
+    # Otherwise search by city/state/genres
+    else:
+        response = ArtistService.search_artist_by_location(city=city, state=state, genres=genres)
+        location_parts = []
+        if city:
+            location_parts.append(city)
+        if state:
+            location_parts.append(state)
+        if genres:
+            location_parts.append(f"{len(genres)} genre(s)")
+        search_label = ', '.join(location_parts)
+    
+    return render_template('pages/search_artists.html', 
+                         results=response, 
+                         search_term=search_term,
+                         city=city,
+                         state=state,
+                         genres=genres,
+                         search_label=search_label,
+                         states=STATE_CHOICES,
+                         genre_choices=GENRE_CHOICES)
 
 # GET /artists/:artist_id
 @artist_bp.route('/<int:artist_id>')

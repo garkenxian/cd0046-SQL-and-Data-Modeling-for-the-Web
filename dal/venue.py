@@ -3,6 +3,7 @@ Venue model - part of the Data Access Layer.
 Represents venue entities in the database.
 """
 
+from datetime import datetime
 from dal import db
 
 
@@ -20,6 +21,7 @@ class Venue(db.Model):
     website = db.Column(db.String)
     seeking_talent = db.Column(db.Boolean, default=False)
     seeking_description = db.Column(db.String)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     # Many-to-many relationship with Genre through venue_genre junction table
     genres = db.relationship(

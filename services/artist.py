@@ -5,6 +5,7 @@ from datetime import datetime
 from dal.artist import Artist
 from dal.show import Show
 from dal.venue import Venue
+from dal.genre import Genre
 from dto.artist import ArtistDTO
 from dal import db
 
@@ -232,3 +233,67 @@ class ArtistService():
         except Exception as e:
             db.session.rollback()
             return False
+
+    @staticmethod
+    def get_recent_artists(limit: int = 10):
+        """Get the most recently created artists.
+        
+        Returns a list of the N most recent artists, ordered by creation date.
+        """
+        try:
+            artists = Artist.query.order_by(
+                Artist.created_at.desc()
+            ).limit(limit).all()
+            
+            return [{
+                "id": artist.id,
+                "name": artist.name,
+                "city": artist.city,
+                "state": artist.state,
+                "image_link": artist.image_link,
+            } for artist in artists]
+        except Exception as e:
+            return []
+
+    @staticmethod
+    def search_artist_by_location(city: str = None, state: str = None, genres: list = None):
+        """Search artists by city, state, and/or genres.
+        
+        Returns matching artists with upcoming shows count.
+        """
+        query = Artist.query
+        
+        if city:
+            query = query.filter(Artist.city.ilike(f'%{city}%'))
+        
+        if state:
+            query = query.filter(Artist.state.ilike(f'%{state}%'))
+        
+        # If genres are specified, filter artists that have at least one of the genres
+        if genres:
+            query = query.join(Artist.genres).filter(Genre.name.in_(genres)).distinct()
+        
+        artists = query.all()
+        
+        results = []
+        now = datetime.now()
+        
+        for artist in artists:
+            # Count upcoming shows for this artist
+            upcoming_shows = Show.query.filter(
+                Show.artist_id == artist.id,
+                Show.start_time >= now
+            ).count()
+            
+            results.append({
+                "id": artist.id,
+                "name": artist.name,
+                "city": artist.city,
+                "state": artist.state,
+                "num_upcoming_shows": upcoming_shows,
+            })
+        
+        return {
+            "count": len(results),
+            "data": results
+        }

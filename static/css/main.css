@@ -197,6 +197,32 @@ h2.monospace {
 .form-wrapper {
   max-width: 400px;
 }
+.form-section {
+  background: #f9f9f9;
+  padding: 25px;
+  border-radius: 8px;
+  border: 1px solid #ebebeb;
+  margin-bottom: 30px;
+}
+.form-section h2 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.5em;
+}
+.form-section .form-group {
+  margin-bottom: 15px;
+}
+.form-section .form-group label {
+  font-weight: bold;
+  margin-bottom: 5px;
+  display: block;
+}
+.form-section button {
+  margin-top: 10px;
+}
+.form-section select[multiple] {
+  min-height: 120px;
+}
 .form-inline {
   font-size: 0;
 }

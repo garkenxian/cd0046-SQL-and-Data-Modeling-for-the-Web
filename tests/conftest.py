@@ -3,6 +3,10 @@
 import os
 import pytest
 from datetime import datetime
+
+# CRITICAL: Set test database BEFORE importing app to ensure it uses SQLite
+os.environ['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+
 from app import app
 from dal import db
 from dto.venue import VenueDTO
@@ -10,31 +14,51 @@ from dto.artist import ArtistDTO
 from dto.show import ShowDTO
 
 
+@pytest.fixture(scope='function', autouse=True)
+def _ensure_test_database():
+    """Ensure we NEVER connect to production database during tests.
+    
+    This runs before every test to verify the database is SQLite.
+    """
+    current_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+    
+    # Safety check: NEVER allow PostgreSQL connections during tests
+    if 'postgresql' in current_uri.lower() or 'postgres' in current_uri.lower():
+        raise RuntimeError(
+            f"CRITICAL: Test attempted to use production database! "
+            f"Database URI: {current_uri}\n"
+            f"Tests must ONLY use SQLite (sqlite:///:memory:). "
+            f"Set SQLALCHEMY_DATABASE_URI environment variable before running tests."
+        )
+    
+    # Ensure we're using SQLite
+    if 'sqlite' not in current_uri.lower():
+        raise RuntimeError(
+            f"CRITICAL: Test database is not SQLite! "
+            f"Current URI: {current_uri}\n"
+            f"Tests must use SQLite only. Set SQLALCHEMY_DATABASE_URI='sqlite:///:memory:'"
+        )
+
+
 @pytest.fixture
 def client():
-    """Create a test client with a test database."""
-    # Store original config
-    original_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
-    
-    # Switch to in-memory SQLite for tests
+    """Create a test client with an in-memory SQLite database."""
+    # Ensure test mode is enabled
     app.config['TESTING'] = True
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
     
     with app.app_context():
-        # Dispose of any existing connections and reset the engine
+        # Dispose of any stale connections
         db.engine.dispose()
         
         # Create all tables for this test
         db.create_all()
+        
         yield app.test_client()
         
         # Cleanup after test
         db.session.remove()
         db.drop_all()
         db.engine.dispose()
-    
-    # Restore original config for other tests/usage
-    app.config['SQLALCHEMY_DATABASE_URI'] = original_uri
 
 
 @pytest.fixture

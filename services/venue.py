@@ -1,10 +1,8 @@
-"""
-Business logic layer for venue-related operations.
-"""
 from datetime import datetime
 from dal.venue import Venue
 from dal.show import Show
 from dal.artist import Artist
+from dal.genre import Genre
 from dto.venue import VenueDTO
 from dal import db
 
@@ -268,3 +266,67 @@ class VenueService():
         except Exception as e:
             db.session.rollback()
             return False
+
+    @staticmethod
+    def get_recent_venues(limit: int = 10):
+        """Get the most recently created venues.
+        
+        Returns a list of the N most recent venues, ordered by creation date.
+        """
+        try:
+            venues = Venue.query.order_by(
+                Venue.created_at.desc()
+            ).limit(limit).all()
+            
+            return [{
+                "id": venue.id,
+                "name": venue.name,
+                "city": venue.city,
+                "state": venue.state,
+                "image_link": venue.image_link,
+            } for venue in venues]
+        except Exception as e:
+            return []
+
+    @staticmethod
+    def search_venue_by_location(city: str = None, state: str = None, genres: list = None):
+        """Search venues by city, state, and/or genres.
+        
+        Returns matching venues with upcoming shows count.
+        """
+        query = Venue.query
+        
+        if city:
+            query = query.filter(Venue.city.ilike(f'%{city}%'))
+        
+        if state:
+            query = query.filter(Venue.state.ilike(f'%{state}%'))
+        
+        # If genres are specified, filter venues that have at least one of the genres
+        if genres:
+            query = query.join(Venue.genres).filter(Genre.name.in_(genres)).distinct()
+        
+        venues = query.all()
+        
+        results = []
+        now = datetime.now()
+        
+        for venue in venues:
+            # Count upcoming shows for this venue
+            upcoming_shows = Show.query.filter(
+                Show.venue_id == venue.id,
+                Show.start_time >= now
+            ).count()
+            
+            results.append({
+                "id": venue.id,
+                "name": venue.name,
+                "city": venue.city,
+                "state": venue.state,
+                "num_upcoming_shows": upcoming_shows,
+            })
+        
+        return {
+            "count": len(results),
+            "data": results
+        }

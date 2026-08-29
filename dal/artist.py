@@ -3,6 +3,7 @@ Artist model - part of the Data Access Layer.
 Represents artist entities in the database.
 """
 
+from datetime import datetime
 from dal import db
 
 
@@ -19,6 +20,7 @@ class Artist(db.Model):
     website = db.Column(db.String)
     seeking_venue = db.Column(db.Boolean, default=False)
     seeking_description = db.Column(db.String)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     # Many-to-many relationship with Genre through artist_genre junction table
     genres = db.relationship(
