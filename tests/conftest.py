@@ -40,11 +40,52 @@ def _ensure_test_database():
         )
 
 
+@pytest.fixture(scope='function', autouse=True)
+def _patch_models_for_tests():
+    """Auto-patch Venue and Artist models to provide defaults for required fields.
+    
+    This allows tests to create Venue/Artist objects without specifying all required fields,
+    while the database still enforces the NOT NULL constraints.
+    """
+    from dal.venue import Venue
+    from dal.artist import Artist
+    
+    # Store original __init__ methods
+    venue_original_init = Venue.__init__
+    artist_original_init = Artist.__init__
+    
+    def venue_init_with_defaults(self, **kwargs):
+        # Provide defaults for required fields
+        kwargs.setdefault('address', 'Test Address')
+        kwargs.setdefault('city', 'Test City')
+        kwargs.setdefault('state', 'CA')
+        kwargs.setdefault('name', 'Test Venue')
+        venue_original_init(self, **kwargs)
+    
+    def artist_init_with_defaults(self, **kwargs):
+        # Provide defaults for required fields
+        kwargs.setdefault('city', 'Test City')
+        kwargs.setdefault('state', 'CA')
+        kwargs.setdefault('name', 'Test Artist')
+        artist_original_init(self, **kwargs)
+    
+    # Apply patches
+    Venue.__init__ = venue_init_with_defaults
+    Artist.__init__ = artist_init_with_defaults
+    
+    yield
+    
+    # Restore original __init__ methods
+    Venue.__init__ = venue_original_init
+    Artist.__init__ = artist_original_init
+
+
 @pytest.fixture
 def client():
     """Create a test client with an in-memory SQLite database."""
     # Ensure test mode is enabled
     app.config['TESTING'] = True
+    app.config['WTF_CSRF_ENABLED'] = False  # Disable CSRF for testing
     
     with app.app_context():
         # Dispose of any stale connections
@@ -116,3 +157,50 @@ def create_show_dto(artist_id, venue_id, start_time):
         venue_id=venue_id,
         start_time=start_time.isoformat() if isinstance(start_time, datetime) else start_time
     )
+
+
+# ============================================================================
+# Helper Functions for Creating Model Instances
+# ============================================================================
+
+def create_venue_model(name='Test Venue', city='SF', state='CA', address='123 St', phone='', genres=None):
+    """Helper to create Venue model instances with all required fields."""
+    from dal.venue import Venue
+    if genres is None:
+        genres = []
+    venue = Venue(
+        name=name,
+        city=city,
+        state=state,
+        address=address,
+        phone=phone,
+        image_link='',
+        facebook_link='',
+        website='',
+        seeking_talent=False,
+        seeking_description=''
+    )
+    if genres:
+        venue.genres = genres
+    return venue
+
+
+def create_artist_model(name='Test Artist', city='SF', state='CA', phone='', genres=None):
+    """Helper to create Artist model instances with all required fields."""
+    from dal.artist import Artist
+    if genres is None:
+        genres = []
+    artist = Artist(
+        name=name,
+        city=city,
+        state=state,
+        phone=phone,
+        image_link='',
+        facebook_link='',
+        website='',
+        seeking_venue=False,
+        seeking_description=''
+    )
+    if genres:
+        artist.genres = genres
+    return artist

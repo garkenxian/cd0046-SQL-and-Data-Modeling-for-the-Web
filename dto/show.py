@@ -13,3 +13,4 @@ class ShowDTO:
     venue_id: int
     artist_id: int
     start_time: str
+    end_time: Optional[str] = None

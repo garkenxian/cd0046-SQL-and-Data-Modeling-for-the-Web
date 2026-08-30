@@ -8,10 +8,10 @@ from dal.venue import Venue
 from dal.genre import Genre
 from dto.artist import ArtistDTO
 from dal import db
+from services.common import CommonService
 
 
 class ArtistService():
-    @staticmethod
     def get_all_artists():
         """Get all artists.
         
@@ -104,6 +104,8 @@ class ArtistService():
             results.append({
                 "id": artist.id,
                 "name": artist.name,
+                "city": artist.city,
+                "state": artist.state,
                 "num_upcoming_shows": upcoming_shows,
             })
         
@@ -116,29 +118,59 @@ class ArtistService():
     def validate_artist_form_data(form_data):
         """Validate and convert form data to ArtistDTO.
         
-        Returns (validation_error, artist_dto)
+        Returns (validation_errors_dict, artist_dto)
+        validation_errors_dict is None if no errors, or dict like {'phone': 'error msg', 'image_link': 'error msg'}
         """
-        validation_error = None
+        errors = {}
         genres = form_data.getlist('genres') if hasattr(form_data, 'getlist') else []
         
         # Extract seeking_venue (WTForms sends 'y' for checked, nothing for unchecked)
         seeking_venue = form_data.get('seeking_venue') == 'y'
         seeking_description = form_data.get('seeking_description', '')
         
+        phone = form_data.get('phone', '').strip()
+        facebook_link = form_data.get('facebook_link', '').strip()
+        website_link = form_data.get('website_link', '').strip()
+        image_link = form_data.get('image_link', '').strip()
+        
+        # Validate phone number
+        phone_valid, phone_error = CommonService.validate_phone(phone)
+        if not phone_valid:
+            errors['phone'] = phone_error
+        
+        # Validate image link
+        img_valid, img_error = CommonService.validate_url(image_link, "Image link")
+        if not img_valid:
+            errors['image_link'] = img_error
+        
+        # Validate facebook link
+        fb_valid, fb_error = CommonService.validate_url(facebook_link, "Facebook link")
+        if not fb_valid:
+            errors['facebook_link'] = fb_error
+        
+        # Validate website link
+        web_valid, web_error = CommonService.validate_url(website_link, "Website link")
+        if not web_valid:
+            errors['website_link'] = web_error
+        
+        # If any validation errors, return them
+        if errors:
+            return errors, None
+        
         data = ArtistDTO(
             id=None,
             name=form_data.get('name', ''),
             city=form_data.get('city', ''),
             state=form_data.get('state', ''),
-            phone=form_data.get('phone', ''),
-            image_link=form_data.get('image_link', ''),
-            facebook_link=form_data.get('facebook_link', ''),
-            website=form_data.get('website_link', ''),
+            phone=phone,
+            image_link=image_link,
+            facebook_link=facebook_link,
+            website=website_link,
             genres=genres,
             seeking_venue=seeking_venue,
             seeking_description=seeking_description
         )
-        return validation_error, data
+        return None, data
 
     @staticmethod
     def create_artist(artist_dto: ArtistDTO):
@@ -219,20 +251,38 @@ class ArtistService():
     def delete_artist(artist_id: int):
         """Delete an artist from the database.
         
-        Returns success status.
+        First checks if artist has any shows. If they do, deletion is prevented
+        and an error message is returned. If deletion proceeds, all associated
+        availability slots are cascade deleted.
+        
+        Returns (success, error_message)
         """
         try:
             artist = Artist.query.get(artist_id)
             if not artist:
-                return False
+                return False, "Artist not found"
             
+            # Check if artist has any shows
+            from dal.show import Show
+            shows = Show.query.filter_by(artist_id=artist_id).all()
+            if shows:
+                upcoming_shows = [s for s in shows if s.start_time > datetime.now()]
+                if upcoming_shows:
+                    return (
+                        False,
+                        f"Cannot delete artist with upcoming shows. "
+                        f"Please cancel or reschedule {len(upcoming_shows)} show(s) first."
+                    )
+            
+            # Artist has no shows - safe to delete
+            # Availability slots will cascade delete via FK constraint
             db.session.delete(artist)
             db.session.commit()
             
-            return True
+            return True, None
         except Exception as e:
             db.session.rollback()
-            return False
+            return False, str(e)
 
     @staticmethod
     def get_recent_artists(limit: int = 10):

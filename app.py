@@ -6,11 +6,12 @@ import dateutil.parser
 import babel
 from flask import Flask, render_template
 from flask_moment import Moment
-import logging
-from logging import Formatter, FileHandler
 from forms import *
 from services.common import CommonService
 from controllers import main_bp, venue_bp, artist_bp, show_bp
+from controllers.album import album_bp
+from controllers.song import song_bp
+from logging_config import configure_logging
 
 #----------------------------------------------------------------------------#
 # App Config.
@@ -21,6 +22,9 @@ moment = Moment(app)
 app.config.from_object('config')
 CommonService.init_db(app)
 migrate = CommonService.migrate_db(app)
+
+# Configure logging
+logger = configure_logging(app)
 
 #----------------------------------------------------------------------------#
 # Filters.
@@ -44,6 +48,8 @@ app.register_blueprint(main_bp)
 app.register_blueprint(venue_bp)
 app.register_blueprint(artist_bp)
 app.register_blueprint(show_bp)
+app.register_blueprint(album_bp)
+app.register_blueprint(song_bp)
 
 #----------------------------------------------------------------------------#
 # Error Handlers & CLI

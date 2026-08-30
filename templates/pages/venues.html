@@ -38,7 +38,10 @@
 <hr />
 
 <!-- All Venues by Location -->
-<h2>All Venues</h2>
+<div class="section-header">
+	<h2>All Venues</h2>
+	<a href="/venues/create" class="btn btn-success btn-sm"><i class="fas fa-plus"></i> Add Venue</a>
+</div>
 {% for area in areas %}
 <h3>{{ area.city }}, {{ area.state }}</h3>
 	<ul class="items">

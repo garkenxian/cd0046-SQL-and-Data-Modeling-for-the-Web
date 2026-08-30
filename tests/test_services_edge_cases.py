@@ -4,6 +4,7 @@ import pytest
 from datetime import datetime, timedelta
 from app import app
 from dal import db, Venue, Artist, Show, Genre
+from dal.availability import ArtistAvailability
 from services.venue import VenueService
 from services.artist import ArtistService
 from services.show import ShowService
@@ -49,6 +50,23 @@ def create_artist_dto(name='Test Artist', city='SF', state='CA', phone='555-1234
     )
 
 
+def create_artist_availability(artist_id, day_of_week=0, start_hour=0, end_hour=23):
+    """Helper to create artist availability for testing.
+    
+    By default creates all-day availability (00:00-23:59) for easier testing.
+    """
+    availability = ArtistAvailability(
+        artist_id=artist_id,
+        day_of_week=day_of_week,
+        start_time=datetime.strptime(f"{start_hour:02d}:00", "%H:%M").time(),
+        end_time=datetime.strptime(f"{end_hour:02d}:59", "%H:%M").time(),
+        is_available=True
+    )
+    db.session.add(availability)
+    db.session.commit()
+    return availability
+
+
 class TestServiceEdgeCases:
     """Test edge cases and stress scenarios for services."""
     
@@ -65,10 +83,10 @@ class TestServiceEdgeCases:
                 'city': 'SF',
                 'state': 'CA',
                 'address': '123 Main',
-                'phone': '555-1234',
+                'phone': '555-123-4567',
                 'image_link': 'http://img.com/test.jpg',
-                'facebook_link': 'http://fb.com/test',
-                'website_link': 'http://test.com',
+                'facebook_link': 'https://facebook.com/newvenue',
+                'website_link': 'https://test.com',
                 'genres': ['Jazz', 'Rock']
             })
             
@@ -88,10 +106,10 @@ class TestServiceEdgeCases:
                 'name': 'New Artist',
                 'city': 'SF',
                 'state': 'CA',
-                'phone': '555-1234',
+                'phone': '555-123-4567',
                 'image_link': 'http://img.com/test.jpg',
-                'facebook_link': 'http://fb.com/test',
-                'website_link': 'http://test.com',
+                'facebook_link': 'https://facebook.com/newartist',
+                'website_link': 'https://test.com',
                 'seeking_venue': 'y',
                 'seeking_description': 'Looking for gigs',
                 'genres': ['Jazz']
@@ -141,6 +159,10 @@ class TestServiceEdgeCases:
             venue = Venue(name='Test', city='SF', state='CA')
             db.session.add_all([artist, venue])
             db.session.commit()
+            
+            # Create availability for the artist
+            current_day = datetime.now().weekday()
+            create_artist_availability(artist.id, day_of_week=current_day)
             
             show_dto = ShowDTO(
                 id=None,
@@ -195,7 +217,8 @@ class TestServiceEdgeCases:
                 show = Show(
                     artist_id=artist.id,
                     venue_id=venue.id,
-                    start_time=datetime(2020, 1, 1) + timedelta(days=i)
+                    start_time=datetime(2020, 1, 1) + timedelta(days=i),
+                    end_time=datetime(2020, 1, 1) + timedelta(hours=2)
                 )
                 shows.append(show)
             db.session.add_all(shows)
@@ -220,7 +243,8 @@ class TestServiceEdgeCases:
                     show = Show(
                         artist_id=artist.id,
                         venue_id=venue.id,
-                        start_time=datetime(2020, 1, 1) + timedelta(days=i*5+j)
+                        start_time=datetime(2020, 1, 1) + timedelta(days=i*5+j),
+                        end_time=datetime(2020, 1, 1) + timedelta(hours=2)
                     )
                     shows.append(show)
             db.session.add_all(shows)
@@ -240,7 +264,8 @@ class TestServiceEdgeCases:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now() + timedelta(days=30)
+                start_time=datetime.now() + timedelta(days=30),
+                end_time=datetime.now() + timedelta(days=30, hours=2)
             )
             db.session.add(show)
             db.session.commit()
@@ -265,7 +290,8 @@ class TestServiceEdgeCases:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now() + timedelta(days=30)
+                start_time=datetime.now() + timedelta(days=30),
+                end_time=datetime.now() + timedelta(days=30, hours=2)
             )
             db.session.add(show)
             db.session.commit()

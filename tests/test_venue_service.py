@@ -89,7 +89,8 @@ class TestVenueService:
             future_show = Show(
                 venue_id=venue.id,
                 artist_id=artist.id,
-                start_time=datetime.now() + timedelta(days=30)
+                start_time=datetime.now() + timedelta(days=30),
+                end_time=datetime.now() + timedelta(days=30, hours=2)
             )
             db.session.add(future_show)
             db.session.commit()
@@ -141,13 +142,15 @@ class TestVenueService:
             past_show = Show(
                 venue_id=venue.id,
                 artist_id=artist.id,
-                start_time=datetime(2020, 1, 1, 12, 0, 0)
+                start_time=datetime(2020, 1, 1, 12, 0, 0),
+                end_time=datetime(2020, 1, 1, 14, 0, 0)
             )
             # Add upcoming show
             upcoming_show = Show(
                 venue_id=venue.id,
                 artist_id=artist.id,
-                start_time=datetime.now() + timedelta(days=30)
+                start_time=datetime.now() + timedelta(days=30),
+                end_time=datetime.now() + timedelta(days=30, hours=2)
             )
             db.session.add_all([past_show, upcoming_show])
             db.session.commit()

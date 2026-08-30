@@ -89,12 +89,14 @@ class TestArtistService:
             past_show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime(2020, 1, 1, 12, 0, 0)
+                start_time=datetime(2020, 1, 1, 12, 0, 0),
+                end_time=datetime(2020, 1, 1, 14, 0, 0)
             )
             upcoming_show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now() + timedelta(days=30)
+                start_time=datetime.now() + timedelta(days=30),
+                end_time=datetime.now() + timedelta(days=30, hours=2)
             )
             db.session.add_all([past_show, upcoming_show])
             db.session.commit()

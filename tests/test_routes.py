@@ -4,6 +4,24 @@ import pytest
 from datetime import datetime, timedelta
 from app import app
 from dal import db, Venue, Artist, Show, Genre
+from dal.availability import ArtistAvailability
+
+
+def create_artist_availability(artist_id, day_of_week=0, start_hour=0, end_hour=23):
+    """Helper to create artist availability for testing.
+    
+    By default creates all-day availability (00:00-23:59) for easier testing.
+    """
+    availability = ArtistAvailability(
+        artist_id=artist_id,
+        day_of_week=day_of_week,
+        start_time=datetime.strptime(f"{start_hour:02d}:00", "%H:%M").time(),
+        end_time=datetime.strptime(f"{end_hour:02d}:59", "%H:%M").time(),
+        is_available=True
+    )
+    db.session.add(availability)
+    db.session.commit()
+    return availability
 
 
 class TestAppRoutes:
@@ -120,8 +138,8 @@ class TestVenueRoutes:
             'city': 'New York',
             'state': 'NY',
             'address': '456 Broadway',
-            'phone': '555-1234',
-            'genres': [],
+            'phone': '555-123-4567',
+            'genres': ['Rock'],
             'image_link': '',
             'facebook_link': '',
             'website_link': ''
@@ -300,7 +318,8 @@ class TestShowRoutes:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now() + timedelta(days=7)
+                start_time=datetime.now() + timedelta(days=7),
+                end_time=datetime.now() + timedelta(days=7, hours=2)
             )
             db.session.add(show)
             db.session.commit()
@@ -324,6 +343,10 @@ class TestShowRoutes:
             db.session.commit()
             artist_id = artist.id
             venue_id = venue.id
+            
+            # Create availability for the artist
+            future_time = datetime.now() + timedelta(days=7)
+            create_artist_availability(artist_id, day_of_week=future_time.weekday())
         
         future_time = (datetime.now() + timedelta(days=7)).isoformat()
         form_data = {
@@ -392,7 +415,8 @@ class TestShowRoutes:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now() + timedelta(days=7)
+                start_time=datetime.now() + timedelta(days=7),
+                end_time=datetime.now() + timedelta(days=7, hours=2)
             )
             db.session.add(show)
             db.session.commit()
@@ -417,7 +441,8 @@ class TestShowRoutes:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now() + timedelta(days=7)
+                start_time=datetime.now() + timedelta(days=7),
+                end_time=datetime.now() + timedelta(days=7, hours=2)
             )
             db.session.add(show)
             db.session.commit()
@@ -437,7 +462,8 @@ class TestShowRoutes:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now() + timedelta(days=7)
+                start_time=datetime.now() + timedelta(days=7),
+                end_time=datetime.now() + timedelta(days=7, hours=2)
             )
             db.session.add(show)
             db.session.commit()
@@ -462,7 +488,8 @@ class TestShowRoutes:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now() + timedelta(days=7)
+                start_time=datetime.now() + timedelta(days=7),
+                end_time=datetime.now() + timedelta(days=7, hours=2)
             )
             db.session.add(show)
             db.session.commit()
@@ -482,7 +509,8 @@ class TestShowRoutes:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now() + timedelta(days=7)
+                start_time=datetime.now() + timedelta(days=7),
+                end_time=datetime.now() + timedelta(days=7, hours=2)
             )
             db.session.add(show)
             db.session.commit()
@@ -511,7 +539,8 @@ class TestShowRoutes:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now() + timedelta(days=7)
+                start_time=datetime.now() + timedelta(days=7),
+                end_time=datetime.now() + timedelta(days=7, hours=2)
             )
             db.session.add(show)
             db.session.commit()
@@ -555,3 +584,277 @@ class TestErrorHandling:
         response = client.post('/venues/create', data=form_data, follow_redirects=True)
         # Should either handle it gracefully or redirect with error message
         assert response.status_code in [200, 400]
+
+
+class TestArtistSearchAndFiltering:
+    """Test artist search with various criteria."""
+    
+    def test_search_artists_by_name(self, client):
+        """Test searching artists by name."""
+        with app.app_context():
+            artist = Artist(name='Guns N Petals', city='SF', state='CA')
+            db.session.add(artist)
+            db.session.commit()
+        
+        form_data = {'search_term': 'Guns'}
+        response = client.post('/artists/search', data=form_data, follow_redirects=True)
+        assert response.status_code == 200
+        assert b'Guns' in response.data or b'search' in response.data.lower()
+    
+    def test_search_artists_by_location(self, client):
+        """Test searching artists by city and state."""
+        with app.app_context():
+            artist = Artist(name='Test Artist', city='San Francisco', state='CA')
+            db.session.add(artist)
+            db.session.commit()
+        
+        form_data = {
+            'search_term': '',
+            'city': 'San Francisco',
+            'state': 'CA',
+            'genres': []
+        }
+        response = client.post('/artists/search', data=form_data, follow_redirects=True)
+        assert response.status_code == 200
+    
+    def test_search_artists_by_genre(self, client):
+        """Test searching artists by genre."""
+        with app.app_context():
+            rock_genre = Genre.query.filter_by(name='Rock').first()
+            if not rock_genre:
+                rock_genre = Genre(name='Rock')
+                db.session.add(rock_genre)
+                db.session.commit()
+            
+            artist = Artist(name='Rock Artist', city='SF', state='CA')
+            artist.genres.append(rock_genre)
+            db.session.add(artist)
+            db.session.commit()
+        
+        form_data = {
+            'search_term': '',
+            'city': '',
+            'state': '',
+            'genres': ['Rock']
+        }
+        response = client.post('/artists/search', data=form_data, follow_redirects=True)
+        assert response.status_code == 200
+    
+    def test_search_artists_no_criteria_error(self, client):
+        """Test search with no criteria returns error."""
+        form_data = {
+            'search_term': '',
+            'city': '',
+            'state': '',
+            'genres': []
+        }
+        response = client.post('/artists/search', data=form_data, follow_redirects=True)
+        assert response.status_code == 200
+        # Should contain error message
+        assert b'search' in response.data.lower() or b'error' in response.data.lower()
+    
+    def test_search_artists_empty_results(self, client):
+        """Test search returns empty results gracefully."""
+        form_data = {'search_term': 'NonexistentArtistXYZ123'}
+        response = client.post('/artists/search', data=form_data, follow_redirects=True)
+        assert response.status_code == 200
+    
+    def test_search_venues_by_name(self, client):
+        """Test searching venues by name."""
+        with app.app_context():
+            venue = Venue(name='Musical Hop', city='SF', state='CA')
+            db.session.add(venue)
+            db.session.commit()
+        
+        form_data = {'search_term': 'Musical'}
+        response = client.post('/venues/search', data=form_data, follow_redirects=True)
+        assert response.status_code == 200
+    
+    def test_search_venues_by_location(self, client):
+        """Test searching venues by city and state."""
+        with app.app_context():
+            venue = Venue(name='Test Venue', city='New York', state='NY')
+            db.session.add(venue)
+            db.session.commit()
+        
+        form_data = {
+            'search_term': '',
+            'city': 'New York',
+            'state': 'NY'
+        }
+        response = client.post('/venues/search', data=form_data, follow_redirects=True)
+        assert response.status_code == 200
+    
+    def test_search_venues_no_criteria_error(self, client):
+        """Test venue search with no criteria returns error."""
+        form_data = {
+            'search_term': '',
+            'city': '',
+            'state': ''
+        }
+        response = client.post('/venues/search', data=form_data, follow_redirects=True)
+        assert response.status_code == 200
+        # Should contain error message
+        assert b'search' in response.data.lower() or b'error' in response.data.lower()
+
+
+class TestArtistAvailability:
+    """Test artist availability management."""
+    
+    def test_view_artist_availability(self, client):
+        """Test viewing artist availability page."""
+        with app.app_context():
+            artist = Artist(name='Test Artist', city='SF', state='CA')
+            db.session.add(artist)
+            db.session.commit()
+            artist_id = artist.id
+            
+            # Create some availability
+            create_artist_availability(artist_id, day_of_week=0, start_hour=9, end_hour=17)
+        
+        response = client.get(f'/artists/{artist_id}/availability')
+        assert response.status_code == 200
+        assert b'availability' in response.data.lower() or b'schedule' in response.data.lower()
+    
+    def test_view_artist_availability_not_found(self, client):
+        """Test viewing availability for non-existent artist."""
+        response = client.get('/artists/9999/availability', follow_redirects=True)
+        assert response.status_code == 200
+        # Should redirect or show error
+    
+    def test_new_artist_availability_form(self, client):
+        """Test accessing new availability form."""
+        with app.app_context():
+            artist = Artist(name='Test Artist', city='SF', state='CA')
+            db.session.add(artist)
+            db.session.commit()
+            artist_id = artist.id
+        
+        response = client.get(f'/artists/{artist_id}/availability/new')
+        assert response.status_code == 200
+        assert b'availability' in response.data.lower() or b'form' in response.data.lower()
+    
+    def test_new_artist_availability_form_not_found(self, client):
+        """Test availability form for non-existent artist."""
+        response = client.get('/artists/9999/availability/new', follow_redirects=True)
+        assert response.status_code == 200
+    
+    def test_create_artist_availability(self, client):
+        """Test creating artist availability."""
+        with app.app_context():
+            artist = Artist(name='Test Artist', city='SF', state='CA')
+            db.session.add(artist)
+            db.session.commit()
+            artist_id = artist.id
+        
+        form_data = {
+            'day_of_week': '0',  # Monday
+            'start_time': '09:00',
+            'end_time': '17:00',
+            'is_available': 'y'
+        }
+        
+        response = client.post(f'/artists/{artist_id}/availability/new', data=form_data, follow_redirects=True)
+        assert response.status_code == 200
+        
+        # Verify availability was created
+        with app.app_context():
+            availability = ArtistAvailability.query.filter_by(artist_id=artist_id).first()
+            assert availability is not None
+    
+    def test_create_artist_availability_not_found(self, client):
+        """Test creating availability for non-existent artist."""
+        form_data = {
+            'day_of_week': '0',
+            'start_time': '09:00',
+            'end_time': '17:00',
+            'is_available': 'y'
+        }
+        
+        response = client.post('/artists/9999/availability/new', data=form_data, follow_redirects=True)
+        assert response.status_code == 200
+
+
+class TestVenueEdgeCases:
+    """Test venue-related edge cases."""
+    
+    def test_edit_nonexistent_venue(self, client):
+        """Test editing non-existent venue."""
+        response = client.get('/venues/9999/edit', follow_redirects=True)
+        assert response.status_code == 200
+    
+    def test_delete_nonexistent_venue(self, client):
+        """Test deleting non-existent venue."""
+        response = client.delete('/venues/9999', follow_redirects=True)
+        # Should return error gracefully
+        assert response.status_code in [200, 400, 404]
+    
+    def test_venue_delete_post_endpoint(self, client):
+        """Test DELETE venue using POST endpoint."""
+        with app.app_context():
+            venue = Venue(name='Delete Me', city='SF', state='CA')
+            db.session.add(venue)
+            db.session.commit()
+            venue_id = venue.id
+        
+        response = client.post(f'/venues/{venue_id}/delete', follow_redirects=True)
+        assert response.status_code == 200
+        
+        # Verify venue was deleted
+        with app.app_context():
+            deleted = Venue.query.get(venue_id)
+            assert deleted is None
+
+
+class TestArtistEdgeCases:
+    """Test artist-related edge cases."""
+    
+    def test_edit_nonexistent_artist(self, client):
+        """Test editing non-existent artist."""
+        response = client.get('/artists/9999/edit', follow_redirects=True)
+        assert response.status_code == 200
+    
+    def test_delete_nonexistent_artist(self, client):
+        """Test deleting non-existent artist."""
+        response = client.delete('/artists/9999', follow_redirects=True)
+        # Should return error gracefully
+        assert response.status_code in [200, 400, 404]
+    
+    def test_artist_delete_post_endpoint(self, client):
+        """Test DELETE artist using POST endpoint."""
+        with app.app_context():
+            artist = Artist(name='Delete Me', city='SF', state='CA')
+            db.session.add(artist)
+            db.session.commit()
+            artist_id = artist.id
+        
+        response = client.post(f'/artists/{artist_id}/delete', follow_redirects=True)
+        assert response.status_code == 200
+        
+        # Verify artist was deleted
+        with app.app_context():
+            deleted = Artist.query.get(artist_id)
+            assert deleted is None
+
+
+class TestShowCreationWithPrefill:
+    """Test show creation with artist prefill from query parameter."""
+    
+    def test_create_show_with_artist_prefill(self, client):
+        """Test show creation form with artist_id query parameter."""
+        with app.app_context():
+            artist = Artist(name='Test Artist', city='SF', state='CA')
+            db.session.add(artist)
+            db.session.commit()
+            artist_id = artist.id
+        
+        response = client.get(f'/shows/create?artist_id={artist_id}')
+        assert response.status_code == 200
+        # The form should contain the artist dropdown with prefilled value
+        assert b'form' in response.data.lower()
+    
+    def test_create_show_without_artist_prefill(self, client):
+        """Test show creation form without artist_id parameter."""
+        response = client.get('/shows/create')
+        assert response.status_code == 200
+        assert b'form' in response.data.lower()

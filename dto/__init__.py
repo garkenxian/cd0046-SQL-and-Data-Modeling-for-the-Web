@@ -1,12 +1,8 @@
-"""Data Access Layer - manages all database models and queries."""
+"""Data Transfer Objects (DTOs) for service layer communication."""
 
-from flask_sqlalchemy import SQLAlchemy
+from dto.venue import VenueDTO
+from dto.artist import ArtistDTO
+from dto.show import ShowDTO
+from dto.album import AlbumDTO, SongDTO
 
-# Single shared database instance used across entire app
-db = SQLAlchemy()
-
-# Import models so they're registered with db
-from dal.venue import Venue
-from dal.artist import Artist
-
-__all__ = ['db', 'Venue', 'Artist']
+__all__ = ['VenueDTO', 'ArtistDTO', 'ShowDTO', 'AlbumDTO', 'SongDTO']

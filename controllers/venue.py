@@ -1,5 +1,3 @@
-#TODO: Search that is empty needs to show an error and then return to the referrer
-
 from flask import Blueprint, render_template, request, flash, redirect, url_for
 from forms import VenueForm
 from services.venue import VenueService
@@ -91,12 +89,19 @@ def create_venue_submission():
     Validates the form data, creates the venue in the database,
     and redirects to the venues list on success or redisplays the form on error.
     """
-    form = VenueForm()
-    validation_error, venue_data = VenueService.validate_venue_form_data(request.form)
+    form = VenueForm(formdata=request.form)
+    validation_errors, venue_data = VenueService.validate_venue_form_data(request.form)
     
-    if validation_error:
-        flash(f"Form validation failed: {validation_error}", category='error')
-        return render_template('forms/new_venue.html', form=form, error=validation_error, data=request.form)
+    if validation_errors:
+        # Populate form field errors from validation errors dict
+        for field_name, error_message in validation_errors.items():
+            if field_name != 'general' and hasattr(form, field_name):
+                # WTForms expects errors as a tuple/list
+                form[field_name].errors = (error_message,)
+            elif field_name == 'general':
+                flash(error_message, category='error')
+        
+        return render_template('forms/new_venue.html', form=form, data=request.form)
     
     venue_create_success, venue_fail_reason = VenueService.create_venue(venue_data)
     
@@ -115,12 +120,29 @@ def delete_venue(venue_id):
     Takes venue_id as URL parameter and deletes that venue from the database.
     Returns a JSON response with success or failure status.
     """
-    result = VenueService.delete_venue(venue_id=venue_id)  
+    success, error = VenueService.delete_venue(venue_id=venue_id)
 
-    if result:
+    if success:
         return {'success': True, 'message': 'Venue deleted successfully!'}, 200
     else:
-        return {'success': False, 'message': 'Unable to delete venue'}, 400
+        return {'success': False, 'message': error or 'Unable to delete venue'}, 400
+
+# POST /venues/:venue_id/delete
+@venue_bp.route('/<int:venue_id>/delete', methods=['POST'])
+def delete_venue_post(venue_id):
+    """Delete a venue (POST endpoint for form submissions).
+    
+    Takes venue_id as URL parameter and deletes that venue from the database.
+    Redirects back to /venues on success, or back to venue page with error.
+    """
+    success, error = VenueService.delete_venue(venue_id=venue_id)
+
+    if success:
+        flash('Venue successfully deleted!', 'success')
+        return redirect('/venues')
+    else:
+        flash(f'Unable to delete venue: {error}', 'danger')
+        return redirect(f'/venues/{venue_id}')
 
 # GET /venues/:venue_id/edit
 @venue_bp.route('/<int:venue_id>/edit', methods=['GET'])
@@ -133,6 +155,10 @@ def edit_venue(venue_id):
     # Loads the Venue Data to edit
     form = VenueForm()
     data = VenueService.show_venue_by_venue_id(venue_id=venue_id)
+    
+    if not data:
+        flash(f"Venue with ID {venue_id} not found", category='error')
+        return redirect(request.referrer or url_for('venues.venues'))
     
     # Populate form with venue data
     form.name.data = data.get('name')
@@ -158,14 +184,21 @@ def edit_venue_submission(venue_id):
     updates the venue in the database, and redirects on success
     or redisplays the form on error.
     """
-    form = VenueForm()
+    form = VenueForm(formdata=request.form)
     venue = VenueService.show_venue_by_venue_id(venue_id=venue_id)
     
-    validation_error, venue_data = VenueService.validate_venue_form_data(request.form)
+    validation_errors, venue_data = VenueService.validate_venue_form_data(request.form)
     
-    if validation_error:
-        flash(f"Form validation failed: {validation_error}", category='error')
-        return render_template('forms/edit_venue.html', form=form, venue=venue, error=validation_error)
+    if validation_errors:
+        # Populate form field errors from validation errors dict
+        for field_name, error_message in validation_errors.items():
+            if field_name != 'general' and hasattr(form, field_name):
+                # WTForms expects errors as a tuple/list
+                form[field_name].errors = (error_message,)
+            elif field_name == 'general':
+                flash(error_message, category='error')
+        
+        return render_template('forms/edit_venue.html', form=form, venue=venue)
     
     venue_edit_success, venue_fail_reason = VenueService.update_venue(venue_id, venue_data)
     

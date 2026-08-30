@@ -235,3 +235,17 @@ h2.monospace {
 .subtitle {
   opacity: 0.5;
 }
+/* Section headers with action buttons */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.section-header h2 {
+  margin: 0;
+}
+.section-header .btn {
+  font-size: 14px;
+  padding: 5px 12px;
+}

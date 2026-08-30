@@ -58,6 +58,7 @@ def show_show(show_id):
 def create_show_form():
     """Display the form to create a new show.
     
+    Accepts optional artist_id query parameter to prefill the artist field.
     Returns the show creation form for user to fill out.
     """
     form = ShowForm()
@@ -67,6 +68,11 @@ def create_show_form():
     
     form.venue_id.choices = [(v.id, f"{v.name} ({v.city}, {v.state})") for v in venues]
     form.artist_id.choices = [(a.id, f"{a.name}") for a in artists]
+    
+    # Check if artist_id is provided as query parameter to prefill
+    artist_id = request.args.get('artist_id', type=int)
+    if artist_id:
+        form.artist_id.data = artist_id
     
     return render_template('forms/new_show.html', form=form, data={}, now=datetime.now())
 
@@ -129,6 +135,10 @@ def edit_show(show_id):
     if start_time_str:
         form.start_time.data = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
     
+    end_time_str = data.get('end_time')
+    if end_time_str:
+        form.end_time.data = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
+    
     return render_template('forms/edit_show.html', form=form, show=data)
 
 # POST /shows/:show_id/edit
@@ -176,9 +186,26 @@ def delete_show(show_id):
     Takes show_id as URL parameter and deletes that show from the database.
     Returns a JSON response with success or failure status.
     """
-    result = ShowService.delete_show(show_id=show_id)
+    success, error = ShowService.delete_show(show_id=show_id)
 
-    if result:
+    if success:
         return {'success': True, 'message': 'Show deleted successfully!'}, 200
     else:
-        return {'success': False, 'message': 'Unable to delete show'}, 400
+        return {'success': False, 'message': error or 'Unable to delete show'}, 400
+
+# POST /shows/:show_id/delete
+@show_bp.route('/<int:show_id>/delete', methods=['POST'])
+def delete_show_post(show_id):
+    """Delete a show (POST endpoint for form submissions).
+    
+    Takes show_id as URL parameter and deletes that show from the database.
+    Redirects back to /shows on success, or back to show page with error.
+    """
+    success, error = ShowService.delete_show(show_id=show_id)
+
+    if success:
+        flash('Show successfully deleted!', 'success')
+        return redirect('/shows')
+    else:
+        flash(f'Unable to delete show: {error}', 'danger')
+        return redirect(f'/shows/{show_id}')

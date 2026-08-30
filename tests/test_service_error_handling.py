@@ -139,7 +139,8 @@ class TestVenueServiceErrorHandling:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now()
+                start_time=datetime.now(),
+                end_time=datetime.now() + timedelta(hours=2)
             )
             db.session.add(show)
             db.session.commit()
@@ -318,7 +319,8 @@ class TestShowServiceErrorHandling:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now()
+                start_time=datetime.now(),
+                end_time=datetime.now() + timedelta(hours=2)
             )
             db.session.add(show)
             db.session.commit()
@@ -364,7 +366,8 @@ class TestShowServiceErrorHandling:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now()
+                start_time=datetime.now(),
+                end_time=datetime.now() + timedelta(hours=2)
             )
             db.session.add(show)
             db.session.commit()

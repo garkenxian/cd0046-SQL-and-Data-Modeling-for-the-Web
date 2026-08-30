@@ -5,9 +5,9 @@ from dal.artist import Artist
 from dal.genre import Genre
 from dto.venue import VenueDTO
 from dal import db
+from services.common import CommonService
 
 class VenueService():
-    @staticmethod
     def get_venues_grouped_by_location():
         """Get all venues grouped by city and state.
         
@@ -136,6 +136,8 @@ class VenueService():
             results.append({
                 "id": venue.id,
                 "name": venue.name,
+                "city": venue.city,
+                "state": venue.state,
                 "num_upcoming_shows": upcoming_shows,
             })
         
@@ -146,7 +148,12 @@ class VenueService():
 
     @staticmethod
     def validate_venue_form_data(form_data):
-        validation_error = None
+        """Validate venue form data and collect all errors.
+        
+        Returns (validation_errors_dict, venue_dto)
+        validation_errors_dict is None if no errors, or dict like {'phone': 'error msg', 'image_link': 'error msg'}
+        """
+        errors = {}
         try:
             genres = form_data.getlist('genres') if hasattr(form_data, 'getlist') else []
             
@@ -154,24 +161,52 @@ class VenueService():
             seeking_talent = form_data.get('seeking_talent') == 'y'
             seeking_description = form_data.get('seeking_description', '')
             
+            phone = form_data.get('phone', '').strip()
+            facebook_link = form_data.get('facebook_link', '').strip()
+            website_link = form_data.get('website_link', '').strip()
+            image_link = form_data.get('image_link', '').strip()
+            
+            # Validate phone number
+            phone_valid, phone_error = CommonService.validate_phone(phone)
+            if not phone_valid:
+                errors['phone'] = phone_error
+            
+            # Validate image link
+            img_valid, img_error = CommonService.validate_url(image_link, "Image link")
+            if not img_valid:
+                errors['image_link'] = img_error
+            
+            # Validate facebook link
+            fb_valid, fb_error = CommonService.validate_url(facebook_link, "Facebook link")
+            if not fb_valid:
+                errors['facebook_link'] = fb_error
+            
+            # Validate website link
+            web_valid, web_error = CommonService.validate_url(website_link, "Website link")
+            if not web_valid:
+                errors['website_link'] = web_error
+            
+            # If any validation errors, return them
+            if errors:
+                return errors, None
+            
             data = VenueDTO(
                 id=None,
                 name=form_data['name'],
                 city=form_data['city'],
                 state=form_data['state'],
                 address=form_data['address'],
-                phone=form_data['phone'],
-                image_link=form_data['image_link'],
-                facebook_link=form_data['facebook_link'],
-                website=form_data.get('website_link', ''),
+                phone=phone,
+                image_link=image_link,
+                facebook_link=facebook_link,
+                website=website_link,
                 seeking_talent=seeking_talent,
                 seeking_description=seeking_description,
                 genres=genres
             )
-            return validation_error, data
+            return None, data
         except (KeyError, AttributeError) as e:
-            validation_error = f"Missing required field: {str(e)}"
-            return validation_error, None
+            return {'general': f"Missing required field: {str(e)}"}, None
 
     @staticmethod
     def create_venue(venue_dto: VenueDTO):
@@ -252,20 +287,37 @@ class VenueService():
     def delete_venue(venue_id: int):
         """Delete a venue from the database.
         
-        Returns success status.
+        First checks if venue has any shows. If they do, deletion is prevented
+        and an error message is returned.
+        
+        Returns (success, error_message)
         """
         try:
             venue = Venue.query.get(venue_id)
             if not venue:
-                return False
+                return False, "Venue not found"
             
+            # Check if venue has any shows
+            from dal.show import Show
+            from datetime import datetime
+            shows = Show.query.filter_by(venue_id=venue_id).all()
+            if shows:
+                upcoming_shows = [s for s in shows if s.start_time > datetime.now()]
+                if upcoming_shows:
+                    return (
+                        False,
+                        f"Cannot delete venue with upcoming shows. "
+                        f"Please cancel or reschedule {len(upcoming_shows)} show(s) first."
+                    )
+            
+            # Venue has no upcoming shows - safe to delete
             db.session.delete(venue)
             db.session.commit()
             
-            return True
+            return True, None
         except Exception as e:
             db.session.rollback()
-            return False
+            return False, str(e)
 
     @staticmethod
     def get_recent_venues(limit: int = 10):

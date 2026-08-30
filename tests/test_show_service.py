@@ -4,6 +4,7 @@ import pytest
 from datetime import datetime, timedelta
 from app import app
 from dal import db, Venue, Artist, Show, Genre
+from dal.availability import ArtistAvailability
 from services.show import ShowService
 from dto.show import ShowDTO
 
@@ -16,6 +17,23 @@ def create_show_dto(artist_id, venue_id, start_time):
         venue_id=venue_id,
         start_time=start_time.isoformat() if isinstance(start_time, datetime) else start_time
     )
+
+
+def create_artist_availability(artist_id, day_of_week=0, start_hour=0, end_hour=23):
+    """Helper to create artist availability for testing.
+    
+    By default creates all-day availability (00:00-23:59) for easier testing.
+    """
+    availability = ArtistAvailability(
+        artist_id=artist_id,
+        day_of_week=day_of_week,
+        start_time=datetime.strptime(f"{start_hour:02d}:00", "%H:%M").time(),
+        end_time=datetime.strptime(f"{end_hour:02d}:59", "%H:%M").time(),
+        is_available=True
+    )
+    db.session.add(availability)
+    db.session.commit()
+    return availability
 
 
 class TestShowService:
@@ -38,7 +56,8 @@ class TestShowService:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now() + timedelta(days=30)
+                start_time=datetime.now() + timedelta(days=30),
+                end_time=datetime.now() + timedelta(days=30, hours=2)
             )
             db.session.add(show)
             db.session.commit()
@@ -62,7 +81,8 @@ class TestShowService:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=start_time
+                start_time=start_time,
+                end_time=start_time + timedelta(hours=2)
             )
             db.session.add(show)
             db.session.commit()
@@ -91,7 +111,8 @@ class TestShowService:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now() + timedelta(days=30)
+                start_time=datetime.now() + timedelta(days=30),
+                end_time=datetime.now() + timedelta(days=30, hours=2)
             )
             db.session.add(show)
             db.session.commit()
@@ -113,8 +134,8 @@ class TestShowService:
             db.session.add_all([artist1, artist2, venue])
             db.session.commit()
             
-            show1 = Show(artist_id=artist1.id, venue_id=venue.id, start_time=datetime.now())
-            show2 = Show(artist_id=artist2.id, venue_id=venue.id, start_time=datetime.now())
+            show1 = Show(artist_id=artist1.id, venue_id=venue.id, start_time=datetime.now(), end_time=datetime.now() + timedelta(hours=2))
+            show2 = Show(artist_id=artist2.id, venue_id=venue.id, start_time=datetime.now(), end_time=datetime.now() + timedelta(hours=2))
             db.session.add_all([show1, show2])
             db.session.commit()
             
@@ -131,8 +152,8 @@ class TestShowService:
             db.session.add_all([artist, venue1, venue2])
             db.session.commit()
             
-            show1 = Show(artist_id=artist.id, venue_id=venue1.id, start_time=datetime.now())
-            show2 = Show(artist_id=artist.id, venue_id=venue2.id, start_time=datetime.now())
+            show1 = Show(artist_id=artist.id, venue_id=venue1.id, start_time=datetime.now(), end_time=datetime.now() + timedelta(hours=2))
+            show2 = Show(artist_id=artist.id, venue_id=venue2.id, start_time=datetime.now(), end_time=datetime.now() + timedelta(hours=2))
             db.session.add_all([show1, show2])
             db.session.commit()
             
@@ -148,7 +169,11 @@ class TestShowService:
             db.session.add_all([artist, venue])
             db.session.commit()
             
+            # Create availability for the artist
             start_time = datetime.now() + timedelta(days=30)
+            day_of_week = start_time.weekday()
+            create_artist_availability(artist.id, day_of_week=day_of_week)
+            
             show_dto = create_show_dto(
                 artist_id=artist.id,
                 venue_id=venue.id,
@@ -173,6 +198,9 @@ class TestShowService:
             venue = Venue(name='Test Venue', city='SF', state='CA')
             db.session.add_all([artist, venue])
             db.session.commit()
+            
+            # Create availability for Thursday (Dec 25, 2025 is a Thursday)
+            create_artist_availability(artist.id, day_of_week=3)
             
             show_dto = ShowDTO(
                 id=None,
@@ -200,15 +228,22 @@ class TestShowService:
             db.session.commit()
             
             original_time = datetime.now() + timedelta(days=30)
+            # Create availability for original day
+            create_artist_availability(artist.id, day_of_week=original_time.weekday())
+            
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=original_time
+                start_time=original_time,
+                end_time=original_time + timedelta(hours=2)
             )
             db.session.add(show)
             db.session.commit()
             
             new_time = datetime.now() + timedelta(days=60)
+            # Create availability for new day
+            create_artist_availability(artist.id, day_of_week=new_time.weekday())
+            
             update_dto = ShowDTO(
                 id=show.id,
                 artist_id=artist.id,
@@ -249,7 +284,8 @@ class TestShowService:
             show = Show(
                 artist_id=artist.id,
                 venue_id=venue.id,
-                start_time=datetime.now() + timedelta(days=30)
+                start_time=datetime.now() + timedelta(days=30),
+                end_time=datetime.now() + timedelta(days=30, hours=2)
             )
             db.session.add(show)
             db.session.commit()
