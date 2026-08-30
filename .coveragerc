@@ -5,6 +5,7 @@ omit =
     */venv/*
     setup.py
     */site-packages/*
+    test_helpers/seed.py
 
 [report]
 exclude_lines =
