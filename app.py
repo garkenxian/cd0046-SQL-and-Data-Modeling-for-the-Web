@@ -6,11 +6,6 @@ import dateutil.parser
 import babel
 from flask import Flask, render_template
 from flask_moment import Moment
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-import logging
-from logging import Formatter, FileHandler
-from flask_wtf import Form
 from forms import *
 from services.common import CommonService
 from controllers import main_bp, venue_bp, artist_bp, show_bp
@@ -25,8 +20,8 @@ from logging_config import configure_logging
 app = Flask(__name__)
 moment = Moment(app)
 app.config.from_object('config')
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
+CommonService.init_db(app)
+migrate = CommonService.migrate_db(app)
 
 # Configure logging
 logger = configure_logging(app)

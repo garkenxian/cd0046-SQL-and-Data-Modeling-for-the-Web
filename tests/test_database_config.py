@@ -2,7 +2,8 @@
 
 import os
 from sqlalchemy import text
-from app import app, db, Venue, Artist
+from app import app
+from dal import db, Venue, Artist
 
 
 class TestDatabaseConfiguration:
@@ -62,7 +63,7 @@ class TestVenueAndArtistTables:
         """Test that Venue table can be created."""
         with app.app_context():
             # Verify table structure
-            assert Venue.__tablename__ == 'Venue'
+            assert Venue.__tablename__ == 'venue'
             # Verify key columns exist
             assert hasattr(Venue, 'id')
             assert hasattr(Venue, 'name')
@@ -75,7 +76,7 @@ class TestVenueAndArtistTables:
         """Test that Artist table can be created."""
         with app.app_context():
             # Verify table structure
-            assert Artist.__tablename__ == 'Artist'
+            assert Artist.__tablename__ == 'artist'
             # Verify key columns exist
             assert hasattr(Artist, 'id')
             assert hasattr(Artist, 'name')
