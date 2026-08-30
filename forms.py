@@ -27,8 +27,7 @@ class ShowForm(FlaskForm):
     start_time = DateTimeField(
         'start_time',
         validators=[DataRequired()],
-        format='%Y-%m-%d %H:%M',
-        default=datetime.today()
+        format='%Y-%m-%d %H:%M'
     )
     end_time = DateTimeField(
         'end_time',

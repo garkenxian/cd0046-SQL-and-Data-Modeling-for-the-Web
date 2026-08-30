@@ -56,6 +56,7 @@
             <li {% if request.endpoint == 'venues.venues' %} class="active" {% endif %}><a href="{{ url_for('venues.venues') }}">Venues</a></li>
             <li {% if request.endpoint == 'artists.artists' %} class="active" {% endif %}><a href="{{ url_for('artists.artists') }}">Artists</a></li>
             <li {% if request.endpoint == 'shows.shows' %} class="active" {% endif %}><a href="{{ url_for('shows.shows') }}">Shows</a></li>
+            <li {% if request.endpoint == 'albums.albums' %} class="active" {% endif %}><a href="{{ url_for('albums.albums') }}">Albums</a></li>
           </ul>
         </div><!--/.nav-collapse -->
       </div>
@@ -64,10 +65,16 @@
     <!-- Begin page content -->
     <main id="content" role="main" class="container">
 
-      {% with messages = get_flashed_messages() %}
+      {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-          {% for message in messages %}
-            <div class="alert alert-block alert-info fade in">
+          {% for category, message in messages %}
+            {% if category == 'error' %}
+              <div class="alert alert-block alert-danger fade in">
+            {% elif category == 'success' %}
+              <div class="alert alert-block alert-success fade in">
+            {% else %}
+              <div class="alert alert-block alert-info fade in">
+            {% endif %}
               <a class="close" data-dismiss="alert">&times;</a>
               {{ message }}
             </div>

@@ -247,3 +247,53 @@ class AvailabilityService:
         except Exception as e:
             logger.exception(f"Error summarizing availability for artist {artist_id}: {str(e)}")
             return f"Error retrieving availability: {str(e)}"
+
+    @staticmethod
+    def get_artist_availability_summary(artist_id):
+        """
+        Get structured artist availability data for display on booking form.
+        
+        Returns:
+            dict: Contains 'recurring_slots' and 'exceptions' lists, or None if error
+        """
+        try:
+            day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            
+            # Get recurring slots (both available and unavailable)
+            recurring_slots = []
+            slots = ArtistAvailability.query.filter(
+                ArtistAvailability.artist_id == artist_id
+            ).order_by(ArtistAvailability.day_of_week, ArtistAvailability.start_time).all()
+            
+            for slot in slots:
+                day_name = day_names[slot.day_of_week]
+                time_range = f"{slot.start_time.strftime('%H:%M')}-{slot.end_time.strftime('%H:%M')}"
+                status = "Available" if slot.is_available else "❌ Unavailable (Blackout)"
+                recurring_slots.append(f"{day_name}: {time_range} - {status}")
+            
+            # Get upcoming exceptions (next 30 days)
+            from datetime import datetime, timedelta
+            today = datetime.now().date()
+            thirty_days_later = today + timedelta(days=30)
+            
+            exception_list = []
+            exceptions = ArtistAvailabilityException.query.filter(
+                ArtistAvailabilityException.artist_id == artist_id,
+                ArtistAvailabilityException.exception_date >= today,
+                ArtistAvailabilityException.exception_date <= thirty_days_later
+            ).order_by(ArtistAvailabilityException.exception_date).all()
+            
+            for exc in exceptions:
+                reason = f" ({exc.reason})" if exc.reason else ""
+                time_range = f"{exc.start_time.strftime('%H:%M')}-{exc.end_time.strftime('%H:%M')}"
+                status = "Available (Exception)" if exc.is_available else "❌ Unavailable (Exception)"
+                exception_list.append(f"{exc.exception_date}: {time_range} - {status}{reason}")
+            
+            return {
+                'recurring_slots': recurring_slots,
+                'exceptions': exception_list
+            }
+        
+        except Exception as e:
+            logger.exception(f"Error getting availability summary for artist {artist_id}: {str(e)}")
+            return None

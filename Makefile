@@ -10,7 +10,7 @@ help:
 	@echo "  make run              Start the Flask application"
 	@echo ""
 	@echo "Testing:"
-	@echo "  make test             Run unit tests"
+	@echo "  make test             Run unit & integration tests"
 	@echo "  make test-cov         Run tests with coverage report (HTML)"
 	@echo ""
 	@echo "Code Quality:"
@@ -31,13 +31,13 @@ install:
 	pip install -r requirements.txt
 
 run:
-	python app.py
+	python3 app.py
 
 test:
-	python -m pytest tests/ -v
+	python3 -m pytest tests/ -v
 
 test-cov:
-	python -m pytest tests/ -v --cov=. --cov-report=html --cov-report=term-missing
+	python3 -m pytest tests/ -v --cov=. --cov-report=html --cov-report=term-missing
 	@echo ""
 	@echo "Coverage report generated! Open htmlcov/index.html to view"
 
@@ -46,7 +46,7 @@ lint:
 	flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
 db-init:
-	python -c "from app import app; from dal import db; ctx = app.app_context(); ctx.push(); db.create_all(); print('✅ Database initialized!')"
+	python3 -c "from app import app; from dal import db; ctx = app.app_context(); ctx.push(); db.create_all(); print('✅ Database initialized!')"
 
 db-migrate:
 	flask db migrate
@@ -55,10 +55,10 @@ db-upgrade:
 	flask db upgrade
 
 db-reset:
-	python -c "from app import app; from dal import db; ctx = app.app_context(); ctx.push(); db.drop_all(); db.create_all(); print('✅ Database reset!')"
+	python3 -c "from app import app; from dal import db; ctx = app.app_context(); ctx.push(); db.drop_all(); db.create_all(); print('✅ Database reset!')"
 
 db-seed:
-	python -c "from app import app; from dal import db; from test_helpers.seed import seed_database; ctx = app.app_context(); ctx.push(); seed_database(); print('✅ Database seeded with sample data!')"
+	python3 -c "from app import app; from dal import db; from test_helpers.seed import seed_database; ctx = app.app_context(); ctx.push(); seed_database(); print('✅ Database seeded with sample data!')"
 
 db-refresh: db-reset db-seed
 	@echo "✅ Database refreshed!"

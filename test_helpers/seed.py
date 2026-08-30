@@ -1,8 +1,11 @@
 """Database seeding helper functions."""
 
 from datetime import datetime
+from sqlalchemy import text
 from dal import db, Venue, Artist, Show
 from dal.genre import Genre
+from dal.album import Album
+from dal.song import Song
 
 
 def seed_database():
@@ -18,7 +21,13 @@ def seed_database():
     """
     try:
         # Clear existing data (in reverse order of dependencies)
+        # Must delete from junction tables first to avoid foreign key violations
         db.session.query(Show).delete()
+        db.session.query(Song).delete()
+        db.session.query(Album).delete()
+        # Delete from junction tables before the main tables
+        db.session.execute(text('DELETE FROM artist_genre'))
+        db.session.execute(text('DELETE FROM venue_genre'))
         db.session.query(Artist).delete()
         db.session.query(Venue).delete()
         db.session.query(Genre).delete()
@@ -130,35 +139,130 @@ def seed_database():
         show1 = Show(
             venue_id=venue1.id,
             artist_id=artist1.id,
-            start_time=datetime(2019, 5, 21, 21, 30, 0)
+            start_time=datetime(2026, 9, 10, 19, 30, 0),
+            end_time=datetime(2026, 9, 10, 21, 30, 0)
         )
 
         show2 = Show(
             venue_id=venue3.id,
             artist_id=artist2.id,
-            start_time=datetime(2019, 6, 15, 23, 0, 0)
+            start_time=datetime(2026, 9, 15, 20, 0, 0),
+            end_time=datetime(2026, 9, 15, 22, 0, 0)
         )
 
         show3 = Show(
             venue_id=venue3.id,
             artist_id=artist3.id,
-            start_time=datetime(2035, 4, 1, 20, 0, 0)
+            start_time=datetime(2026, 9, 20, 21, 0, 0),
+            end_time=datetime(2026, 9, 20, 23, 0, 0)
         )
 
         show4 = Show(
-            venue_id=venue3.id,
-            artist_id=artist3.id,
-            start_time=datetime(2035, 4, 8, 20, 0, 0)
+            venue_id=venue2.id,
+            artist_id=artist1.id,
+            start_time=datetime(2026, 9, 25, 20, 0, 0),
+            end_time=datetime(2026, 9, 25, 22, 30, 0)
         )
 
         show5 = Show(
-            venue_id=venue3.id,
+            venue_id=venue1.id,
+            artist_id=artist2.id,
+            start_time=datetime(2026, 10, 5, 19, 0, 0),
+            end_time=datetime(2026, 10, 5, 21, 0, 0)
+        )
+
+        show6 = Show(
+            venue_id=venue2.id,
             artist_id=artist3.id,
-            start_time=datetime(2035, 4, 15, 20, 0, 0)
+            start_time=datetime(2026, 10, 10, 20, 30, 0),
+            end_time=datetime(2026, 10, 10, 22, 30, 0)
+        )
+
+        show7 = Show(
+            venue_id=venue3.id,
+            artist_id=artist1.id,
+            start_time=datetime(2026, 10, 15, 21, 0, 0),
+            end_time=datetime(2026, 10, 15, 23, 0, 0)
+        )
+
+        show8 = Show(
+            venue_id=venue1.id,
+            artist_id=artist3.id,
+            start_time=datetime(2026, 10, 22, 19, 30, 0),
+            end_time=datetime(2026, 10, 22, 21, 30, 0)
         )
 
         # Add and commit shows
-        db.session.add_all([show1, show2, show3, show4, show5])
+        db.session.add_all([show1, show2, show3, show4, show5, show6, show7, show8])
+        db.session.commit()
+
+        # Step 5: Create albums for artists
+        album1 = Album(
+            artist_id=artist1.id,
+            title='Appetite for Destruction',
+            release_date=datetime(1987, 7, 21).date(),
+            description='A legendary debut album that changed rock music forever.',
+            image_link='https://images.unsplash.com/photo-1510915361894-db8b60106cb1?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60',
+            spotify_link='https://open.spotify.com/album/example1'
+        )
+
+        album2 = Album(
+            artist_id=artist1.id,
+            title='G N\'R Lies',
+            release_date=datetime(1988, 11, 29).date(),
+            description='Acoustic and unplugged tracks showcasing raw emotion.',
+            image_link='https://images.unsplash.com/photo-1470225620780-dba8ba36b745?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60',
+            spotify_link='https://open.spotify.com/album/example2'
+        )
+
+        album3 = Album(
+            artist_id=artist2.id,
+            title='Bossa Nova Dreams',
+            release_date=datetime(2020, 3, 15).date(),
+            description='A smooth collection of jazz standards and original compositions.',
+            image_link='https://images.unsplash.com/photo-1514525253161-7a46d19cd819?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60',
+            spotify_link='https://open.spotify.com/album/example3'
+        )
+
+        album4 = Album(
+            artist_id=artist3.id,
+            title='Wild Sax Sessions',
+            release_date=datetime(2019, 8, 22).date(),
+            description='High-energy jazz performances featuring incredible saxophone work.',
+            image_link='https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60',
+            spotify_link='https://open.spotify.com/album/example4'
+        )
+
+        db.session.add_all([album1, album2, album3, album4])
+        db.session.commit()
+
+        # Step 6: Create songs for albums
+        # Songs for album1
+        song1 = Song(album_id=album1.id, title='Welcome to the Jungle', duration=300)
+        song2 = Song(album_id=album1.id, title='Sweet Child o\' Mine', duration=356)
+        song3 = Song(album_id=album1.id, title='Patience', duration=376)
+        song4 = Song(album_id=album1.id, title='Paradise City', duration=384)
+
+        # Songs for album2
+        song5 = Song(album_id=album2.id, title='Don\'t Cry', duration=356)
+        song6 = Song(album_id=album2.id, title='Perfect Crime', duration=301)
+        song7 = Song(album_id=album2.id, title='Dust N\' Bones', duration=385)
+
+        # Songs for album3
+        song8 = Song(album_id=album3.id, title='The Girl from Ipanema', duration=315)
+        song9 = Song(album_id=album3.id, title='Bossa Nova Nights', duration=298)
+        song10 = Song(album_id=album3.id, title='Carioca Moon', duration=340)
+
+        # Songs for album4
+        song11 = Song(album_id=album4.id, title='Midnight Sax', duration=420)
+        song12 = Song(album_id=album4.id, title='Urban Jazz', duration=385)
+        song13 = Song(album_id=album4.id, title='Saxophonic Dreams', duration=365)
+        song14 = Song(album_id=album4.id, title='Syncopation', duration=310)
+
+        db.session.add_all([
+            song1, song2, song3, song4, song5, song6, song7, song8,
+            song9, song10, song11, song12, song13, song14
+        ])
         db.session.commit()
         
         return True, '✅ Database seeded successfully!'

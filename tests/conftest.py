@@ -3,11 +3,12 @@
 import os
 import pytest
 from datetime import datetime
+from pathlib import Path
 
 # CRITICAL: Set test database BEFORE importing app to ensure it uses SQLite
 os.environ['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
 
-from app import app
+from app import app as flask_app
 from dal import db
 from dto.venue import VenueDTO
 from dto.artist import ArtistDTO
@@ -20,7 +21,7 @@ def _ensure_test_database():
     
     This runs before every test to verify the database is SQLite.
     """
-    current_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+    current_uri = flask_app.config.get('SQLALCHEMY_DATABASE_URI', '')
     
     # Safety check: NEVER allow PostgreSQL connections during tests
     if 'postgresql' in current_uri.lower() or 'postgres' in current_uri.lower():
@@ -81,20 +82,42 @@ def _patch_models_for_tests():
 
 
 @pytest.fixture
-def client():
-    """Create a test client with an in-memory SQLite database."""
+def app():
+    """Provide the Flask app instance with test configuration."""
     # Ensure test mode is enabled
-    app.config['TESTING'] = True
-    app.config['WTF_CSRF_ENABLED'] = False  # Disable CSRF for testing
+    flask_app.config['TESTING'] = True
+    flask_app.config['WTF_CSRF_ENABLED'] = False  # Disable CSRF for testing
     
-    with app.app_context():
+    with flask_app.app_context():
         # Dispose of any stale connections
         db.engine.dispose()
         
         # Create all tables for this test
         db.create_all()
         
-        yield app.test_client()
+        yield flask_app
+        
+        # Cleanup after test
+        db.session.remove()
+        db.drop_all()
+        db.engine.dispose()
+
+
+@pytest.fixture
+def client():
+    """Create a test client with an in-memory SQLite database."""
+    # Ensure test mode is enabled
+    flask_app.config['TESTING'] = True
+    flask_app.config['WTF_CSRF_ENABLED'] = False  # Disable CSRF for testing
+    
+    with flask_app.app_context():
+        # Dispose of any stale connections
+        db.engine.dispose()
+        
+        # Create all tables for this test
+        db.create_all()
+        
+        yield flask_app.test_client()
         
         # Cleanup after test
         db.session.remove()

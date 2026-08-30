@@ -1,8 +1,9 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for
 from forms import ShowForm
 from services.show import ShowService
+from services.availability import AvailabilityService
 from dal import Venue, Artist
-from datetime import datetime
+from datetime import datetime, timedelta
 
 show_bp = Blueprint('shows', __name__, url_prefix='/shows')
 
@@ -71,10 +72,23 @@ def create_show_form():
     
     # Check if artist_id is provided as query parameter to prefill
     artist_id = request.args.get('artist_id', type=int)
+    artist_availability = None
+    
     if artist_id:
         form.artist_id.data = artist_id
+        # Fetch and format artist availability
+        availability_data = AvailabilityService.get_artist_availability_summary(artist_id)
+        if availability_data:
+            artist_availability = {
+                'recurring_slots': availability_data.get('recurring_slots', []),
+                'exceptions': availability_data.get('exceptions', [])
+            }
     
-    return render_template('forms/new_show.html', form=form, data={}, now=datetime.now())
+    # Set min_time for start_time input to current time (UTC)
+    # Use utcnow() to avoid timezone offset issues with datetime-local HTML input
+    min_time = datetime.utcnow()
+    
+    return render_template('forms/new_show.html', form=form, data={}, now=min_time, artist_availability=artist_availability)
 
 # POST /shows/create
 @show_bp.route('/create', methods=['POST'])
@@ -95,7 +109,17 @@ def create_show_submission():
     
     if validation_error:
         flash(f"Form validation failed: {validation_error}", category='error')
-        return render_template('forms/new_show.html', form=form, error=validation_error, data=request.form, now=datetime.now())
+        # Fetch artist availability if artist is selected
+        artist_availability = None
+        artist_id = request.form.get('artist_id', type=int)
+        if artist_id:
+            availability_data = AvailabilityService.get_artist_availability_summary(artist_id)
+            if availability_data:
+                artist_availability = {
+                    'recurring_slots': availability_data.get('recurring_slots', []),
+                    'exceptions': availability_data.get('exceptions', [])
+                }
+        return render_template('forms/new_show.html', form=form, error=validation_error, data=request.form, now=datetime.utcnow(), artist_availability=artist_availability)
     
     show_create_success, show_fail_reason = ShowService.create_show(show_data)
     
@@ -104,7 +128,17 @@ def create_show_submission():
         return redirect(url_for('shows.shows', _external=False))
     else:
         flash(f"Show could not be listed: {show_fail_reason}", category='error')
-        return render_template('forms/new_show.html', form=form, error=show_fail_reason, data=request.form, now=datetime.now())
+        # Fetch artist availability if artist is selected
+        artist_availability = None
+        artist_id = request.form.get('artist_id', type=int)
+        if artist_id:
+            availability_data = AvailabilityService.get_artist_availability_summary(artist_id)
+            if availability_data:
+                artist_availability = {
+                    'recurring_slots': availability_data.get('recurring_slots', []),
+                    'exceptions': availability_data.get('exceptions', [])
+                }
+        return render_template('forms/new_show.html', form=form, error=show_fail_reason, data=request.form, now=datetime.utcnow(), artist_availability=artist_availability)
 
 # GET /shows/:show_id/edit
 @show_bp.route('/<int:show_id>/edit', methods=['GET'])
