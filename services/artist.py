@@ -28,22 +28,25 @@ class ArtistService():
         """Get artist details by ID.
         
         Returns artist data with all fields and show information.
+        Uses joined query to efficiently load artist with related shows and venues.
         """
-        artist = Artist.query.get(artist_id)
+        from sqlalchemy.orm import joinedload
+        
+        # Use joined load to fetch artist with shows and their related venues in one query
+        artist = Artist.query.options(
+            joinedload(Artist.shows).joinedload(Show.venue)
+        ).filter_by(id=artist_id).first()
         
         if not artist:
             return None
-        
-        # Query all shows for this artist
-        shows = Show.query.filter_by(artist_id=artist_id).all()
         
         now = datetime.now()
         past_shows = []
         upcoming_shows = []
         
-        for show in shows:
-            # Get venue info
-            venue = Venue.query.get(show.venue_id)
+        # Now the shows and venues are already loaded, no additional queries needed
+        for show in artist.shows:
+            venue = show.venue
             if not venue:
                 continue
             

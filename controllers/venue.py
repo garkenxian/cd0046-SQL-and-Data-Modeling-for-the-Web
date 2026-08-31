@@ -86,27 +86,39 @@ def create_venue_form():
 def create_venue_submission():
     """Handle venue creation form submission.
     
-    Validates the form data, creates the venue in the database,
+    Validates the form data using Flask-WTF, creates the venue in the database,
     and redirects to the venues list on success or redisplays the form on error.
     """
-    form = VenueForm(formdata=request.form)
-    validation_errors, venue_data = VenueService.validate_venue_form_data(request.form)
+    from dto.venue import VenueDTO
     
-    if validation_errors:
-        # Populate form field errors from validation errors dict
-        for field_name, error_message in validation_errors.items():
-            if field_name != 'general' and hasattr(form, field_name):
-                # WTForms expects errors as a tuple/list
-                form[field_name].errors = (error_message,)
-            elif field_name == 'general':
-                flash(error_message, category='error')
-        
+    form = VenueForm(formdata=request.form)
+    
+    # Validate using Flask-WTF validators
+    if not form.validate():
+        # Form validation failed, redisplay form with errors
         return render_template('forms/new_venue.html', form=form, data=request.form)
     
-    venue_create_success, venue_fail_reason = VenueService.create_venue(venue_data)
+    # Create VenueDTO from validated form data
+    venue_dto = VenueDTO(
+        id=None,
+        name=form.name.data,
+        city=form.city.data,
+        state=form.state.data,
+        address=form.address.data,
+        phone=form.phone.data or '',
+        image_link=form.image_link.data or '',
+        genres=form.genres.data or [],
+        facebook_link=form.facebook_link.data or '',
+        website=form.website_link.data or '',
+        seeking_talent=form.seeking_talent.data,
+        seeking_description=form.seeking_description.data or ''
+    )
+    
+    # Create venue with validated DTO
+    venue_create_success, venue_fail_reason = VenueService.create_venue(venue_dto)
     
     if venue_create_success:
-        flash(f"Venue {venue_data.name} was successfully listed!", category='success')
+        flash(f"Venue {venue_dto.name} was successfully listed!", category='success')
         return redirect(url_for('venues.venues', _external=False))
     else:
         flash(f"Venue could not be listed: {venue_fail_reason}", category='error')

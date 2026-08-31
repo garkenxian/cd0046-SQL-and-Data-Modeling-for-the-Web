@@ -348,7 +348,8 @@ class TestShowRoutes:
             future_time = datetime.now() + timedelta(days=7)
             create_artist_availability(artist_id, day_of_week=future_time.weekday())
         
-        future_time = (datetime.now() + timedelta(days=7)).isoformat()
+        # Format datetime in the format expected by the form: '%Y-%m-%d %H:%M'
+        future_time = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d %H:%M')
         form_data = {
             'artist_id': artist_id,
             'venue_id': venue_id,

@@ -59,22 +59,25 @@ class VenueService():
         """Get venue details by ID with past and upcoming shows.
         
         Returns venue data with all fields, shows separated by date.
+        Uses joined query to efficiently load venue with related shows and artists.
         """
-        venue = Venue.query.get(venue_id)
+        from sqlalchemy.orm import joinedload
+        
+        # Use joined load to fetch venue with shows and their related artists in one query
+        venue = Venue.query.options(
+            joinedload(Venue.shows).joinedload(Show.artist)
+        ).filter_by(id=venue_id).first()
         
         if not venue:
             return None
-        
-        # Query all shows for this venue
-        shows = Show.query.filter_by(venue_id=venue_id).all()
         
         now = datetime.now()
         past_shows = []
         upcoming_shows = []
         
-        for show in shows:
-            # Get artist info
-            artist = Artist.query.get(show.artist_id)
+        # Now the shows and artists are already loaded, no additional queries needed
+        for show in venue.shows:
+            artist = show.artist
             if not artist:
                 continue
             

@@ -47,14 +47,21 @@ class ShowService():
         """Get show details by ID.
         
         Returns show data with all fields.
+        Uses joined query to efficiently load show with venue and artist.
         """
-        show = Show.query.get(show_id)
+        from sqlalchemy.orm import joinedload
+        
+        # Use joined load to fetch show with related venue and artist in one query
+        show = Show.query.options(
+            joinedload(Show.venue),
+            joinedload(Show.artist)
+        ).filter_by(id=show_id).first()
         
         if not show:
             return None
         
-        venue = Venue.query.get(show.venue_id)
-        artist = Artist.query.get(show.artist_id)
+        venue = show.venue
+        artist = show.artist
         
         if not venue or not artist:
             return None

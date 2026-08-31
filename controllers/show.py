@@ -95,23 +95,24 @@ def create_show_form():
 def create_show_submission():
     """Handle show creation form submission.
     
-    Validates the form data, creates the show in the database,
+    Validates the form data using Flask-WTF, creates the show in the database,
     and redirects to the shows list on success or redisplays the form on error.
     """
-    form = ShowForm()
-    # Populate dropdowns for re-rendering if validation fails
+    from dto.show import ShowDTO
+    
+    # Populate dropdowns for form
     venues = Venue.query.all()
     artists = Artist.query.all()
+    
+    form = ShowForm()
     form.venue_id.choices = [(v.id, f"{v.name} ({v.city}, {v.state})") for v in venues]
     form.artist_id.choices = [(a.id, f"{a.name}") for a in artists]
     
-    validation_error, show_data = ShowService.validate_show_form_data(request.form)
-    
-    if validation_error:
-        flash(f"Form validation failed: {validation_error}", category='error')
-        # Fetch artist availability if artist is selected
+    # Validate using Flask-WTF validators
+    if not form.validate():
+        # Form validation failed, redisplay form with errors and artist availability info
         artist_availability = None
-        artist_id = request.form.get('artist_id', type=int)
+        artist_id = form.artist_id.data
         if artist_id:
             availability_data = AvailabilityService.get_artist_availability_summary(artist_id)
             if availability_data:
@@ -119,9 +120,23 @@ def create_show_submission():
                     'recurring_slots': availability_data.get('recurring_slots', []),
                     'exceptions': availability_data.get('exceptions', [])
                 }
-        return render_template('forms/new_show.html', form=form, error=validation_error, data=request.form, now=datetime.utcnow(), artist_availability=artist_availability)
+        return render_template('forms/new_show.html', form=form, data=request.form, now=datetime.utcnow(), artist_availability=artist_availability)
     
-    show_create_success, show_fail_reason = ShowService.create_show(show_data)
+    # Create ShowDTO from validated form data
+    # Convert datetime objects to ISO format strings
+    start_time_str = form.start_time.data.isoformat() if form.start_time.data else None
+    end_time_str = form.end_time.data.isoformat() if form.end_time.data else None
+    
+    show_dto = ShowDTO(
+        id=None,
+        venue_id=form.venue_id.data,
+        artist_id=form.artist_id.data,
+        start_time=start_time_str,
+        end_time=end_time_str
+    )
+    
+    # Create show with validated DTO
+    show_create_success, show_fail_reason = ShowService.create_show(show_dto)
     
     if show_create_success:
         flash(f"Show was successfully listed!", category='success')
