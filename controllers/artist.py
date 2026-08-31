@@ -97,27 +97,38 @@ def create_artist_form():
 def create_artist_submission():
     """Handle artist creation form submission.
     
-    Validates the form data, creates the artist in the database,
+    Validates the form data using Flask-WTF, creates the artist in the database,
     and redirects to the artists list on success or redisplays the form on error.
     """
-    form = ArtistForm(formdata=request.form)
-    validation_errors, artist_data = ArtistService.validate_artist_form_data(request.form)
+    from dto.artist import ArtistDTO
     
-    if validation_errors:
-        # Populate form field errors from validation errors dict
-        for field_name, error_message in validation_errors.items():
-            if field_name != 'general' and hasattr(form, field_name):
-                # WTForms expects errors as a tuple/list
-                form[field_name].errors = (error_message,)
-            elif field_name == 'general':
-                flash(error_message, category='error')
-        
+    form = ArtistForm(formdata=request.form)
+    
+    # Validate using Flask-WTF validators
+    if not form.validate():
+        # Form validation failed, redisplay form with errors
         return render_template('forms/new_artist.html', form=form, data=request.form)
     
-    artist_create_success, artist_fail_reason = ArtistService.create_artist(artist_data)
+    # Create ArtistDTO from validated form data
+    artist_dto = ArtistDTO(
+        id=None,
+        name=form.name.data,
+        city=form.city.data,
+        state=form.state.data,
+        phone=form.phone.data or '',
+        image_link=form.image_link.data or '',
+        genres=form.genres.data or [],
+        facebook_link=form.facebook_link.data or '',
+        website=form.website_link.data or '',
+        seeking_venue=form.seeking_venue.data,
+        seeking_description=form.seeking_description.data or ''
+    )
+    
+    # Create artist with validated DTO
+    artist_create_success, artist_fail_reason = ArtistService.create_artist(artist_dto)
     
     if artist_create_success:
-        flash(f"Artist {artist_data.name} was successfully listed!", category='success')
+        flash(f"Artist {artist_dto.name} was successfully listed!", category='success')
         return redirect(url_for('artists.artists', _external=False))
     else:
         flash(f"Artist could not be listed: {artist_fail_reason}", category='error')

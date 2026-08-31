@@ -15,3 +15,7 @@ class Show(db.Model):
     start_time = db.Column(db.DateTime, nullable=False)
     end_time = db.Column(db.DateTime, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Relationships for eager loading
+    venue = db.relationship('Venue', backref='shows')
+    artist = db.relationship('Artist', backref='shows')

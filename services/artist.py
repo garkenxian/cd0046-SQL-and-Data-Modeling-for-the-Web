@@ -28,22 +28,25 @@ class ArtistService():
         """Get artist details by ID.
         
         Returns artist data with all fields and show information.
+        Uses joined query to efficiently load artist with related shows and venues.
         """
-        artist = Artist.query.get(artist_id)
+        from sqlalchemy.orm import joinedload
+        
+        # Use joined load to fetch artist with shows and their related venues in one query
+        artist = Artist.query.options(
+            joinedload(Artist.shows).joinedload(Show.venue)
+        ).filter_by(id=artist_id).first()
         
         if not artist:
             return None
-        
-        # Query all shows for this artist
-        shows = Show.query.filter_by(artist_id=artist_id).all()
         
         now = datetime.now()
         past_shows = []
         upcoming_shows = []
         
-        for show in shows:
-            # Get venue info
-            venue = Venue.query.get(show.venue_id)
+        # Now the shows and venues are already loaded, no additional queries needed
+        for show in artist.shows:
+            venue = show.venue
             if not venue:
                 continue
             
@@ -84,30 +87,36 @@ class ArtistService():
     def search_artist_by_name(search_term: str):
         """Search artists by name (case-insensitive, partial string match).
         
-        Returns matching artists with basic info.
+        Returns matching artists with basic info. Uses single query with aggregation
+        to count upcoming shows for all artists at once.
         """
-        # Query artists where name contains search_term (case-insensitive)
-        artists = Artist.query.filter(
-            Artist.name.ilike(f'%{search_term}%')
-        ).all()
+        from sqlalchemy import func
         
-        results = []
         now = datetime.now()
         
-        for artist in artists:
-            # Count upcoming shows for this artist
-            upcoming_shows = Show.query.filter(
-                Show.artist_id == artist.id,
-                Show.start_time >= now
-            ).count()
-            
-            results.append({
-                "id": artist.id,
-                "name": artist.name,
-                "city": artist.city,
-                "state": artist.state,
-                "num_upcoming_shows": upcoming_shows,
-            })
+        # Single query: get artists AND their upcoming show counts using LEFT OUTER JOIN and GROUP BY
+        artist_show_counts = db.session.query(
+            Artist.id,
+            Artist.name,
+            Artist.city,
+            Artist.state,
+            func.count(Show.id).label('upcoming_shows_count')
+        ).filter(
+            Artist.name.ilike(f'%{search_term}%')
+        ).outerjoin(
+            Show,
+            (Show.artist_id == Artist.id) & (Show.start_time >= now)
+        ).group_by(
+            Artist.id, Artist.name, Artist.city, Artist.state
+        ).all()
+        
+        results = [{
+            "id": artist_id,
+            "name": name,
+            "city": city,
+            "state": state,
+            "num_upcoming_shows": upcoming_shows_count,
+        } for artist_id, name, city, state, upcoming_shows_count in artist_show_counts]
         
         return {
             "count": len(results),
