@@ -17,40 +17,45 @@ class VenueService():
             "state": "CA",
             "venues": [{"id": 1, "name": "...", "num_upcoming_shows": 0}, ...]
         }, ...]
+        
+        Uses single query with aggregation to count upcoming shows for all venues at once.
         """
-        venues = Venue.query.all()
+        from sqlalchemy import func
+        
         now = datetime.now()
         
-        # Group venues by city and state
+        # Single query: get all venues AND their upcoming show counts using LEFT OUTER JOIN and GROUP BY
+        venue_show_counts = db.session.query(
+            Venue.id,
+            Venue.name,
+            Venue.city,
+            Venue.state,
+            func.count(Show.id).label('upcoming_shows_count')
+        ).outerjoin(
+            Show,
+            (Show.venue_id == Venue.id) & (Show.start_time >= now)
+        ).group_by(
+            Venue.id, Venue.name, Venue.city, Venue.state
+        ).all()
+        
+        # Group results by city and state
         grouped = {}
-        for venue in venues:
-            key = (venue.city, venue.state)
+        for venue_id, name, city, state, upcoming_shows_count in venue_show_counts:
+            key = (city, state)
             if key not in grouped:
                 grouped[key] = []
-            grouped[key].append(venue)
+            grouped[key].append({
+                "id": venue_id,
+                "name": name,
+                "num_upcoming_shows": upcoming_shows_count
+            })
         
         # Transform into expected format
-        data = []
-        for (city, state), venue_list in grouped.items():
-            venues_formatted = []
-            for v in venue_list:
-                # Count upcoming shows for this venue
-                num_upcoming_shows = Show.query.filter(
-                    Show.venue_id == v.id,
-                    Show.start_time >= now
-                ).count()
-                
-                venues_formatted.append({
-                    "id": v.id,
-                    "name": v.name,
-                    "num_upcoming_shows": num_upcoming_shows
-                })
-            
-            data.append({
-                "city": city,
-                "state": state,
-                "venues": venues_formatted
-            })
+        data = [{
+            "city": city,
+            "state": state,
+            "venues": venues_formatted
+        } for (city, state), venues_formatted in grouped.items()]
         
         return data
 
@@ -348,8 +353,23 @@ class VenueService():
         """Search venues by city, state, and/or genres.
         
         Returns matching venues with upcoming shows count.
+        Uses single query with aggregation to count upcoming shows for all venues at once.
         """
-        query = Venue.query
+        from sqlalchemy import func
+        
+        now = datetime.now()
+        
+        # Build base query for venues with their upcoming show counts
+        query = db.session.query(
+            Venue.id,
+            Venue.name,
+            Venue.city,
+            Venue.state,
+            func.count(Show.id).label('upcoming_shows_count')
+        ).outerjoin(
+            Show,
+            (Show.venue_id == Venue.id) & (Show.start_time >= now)
+        )
         
         if city:
             query = query.filter(Venue.city.ilike(f'%{city}%'))
@@ -359,27 +379,19 @@ class VenueService():
         
         # If genres are specified, filter venues that have at least one of the genres
         if genres:
-            query = query.join(Venue.genres).filter(Genre.name.in_(genres)).distinct()
+            query = query.join(Venue.genres).filter(Genre.name.in_(genres))
+        
+        query = query.group_by(Venue.id, Venue.name, Venue.city, Venue.state).distinct()
         
         venues = query.all()
         
-        results = []
-        now = datetime.now()
-        
-        for venue in venues:
-            # Count upcoming shows for this venue
-            upcoming_shows = Show.query.filter(
-                Show.venue_id == venue.id,
-                Show.start_time >= now
-            ).count()
-            
-            results.append({
-                "id": venue.id,
-                "name": venue.name,
-                "city": venue.city,
-                "state": venue.state,
-                "num_upcoming_shows": upcoming_shows,
-            })
+        results = [{
+            "id": venue_id,
+            "name": name,
+            "city": city,
+            "state": state,
+            "num_upcoming_shows": upcoming_shows_count,
+        } for venue_id, name, city, state, upcoming_shows_count in venues]
         
         return {
             "count": len(results),

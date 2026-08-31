@@ -87,30 +87,36 @@ class ArtistService():
     def search_artist_by_name(search_term: str):
         """Search artists by name (case-insensitive, partial string match).
         
-        Returns matching artists with basic info.
+        Returns matching artists with basic info. Uses single query with aggregation
+        to count upcoming shows for all artists at once.
         """
-        # Query artists where name contains search_term (case-insensitive)
-        artists = Artist.query.filter(
-            Artist.name.ilike(f'%{search_term}%')
-        ).all()
+        from sqlalchemy import func
         
-        results = []
         now = datetime.now()
         
-        for artist in artists:
-            # Count upcoming shows for this artist
-            upcoming_shows = Show.query.filter(
-                Show.artist_id == artist.id,
-                Show.start_time >= now
-            ).count()
-            
-            results.append({
-                "id": artist.id,
-                "name": artist.name,
-                "city": artist.city,
-                "state": artist.state,
-                "num_upcoming_shows": upcoming_shows,
-            })
+        # Single query: get artists AND their upcoming show counts using LEFT OUTER JOIN and GROUP BY
+        artist_show_counts = db.session.query(
+            Artist.id,
+            Artist.name,
+            Artist.city,
+            Artist.state,
+            func.count(Show.id).label('upcoming_shows_count')
+        ).filter(
+            Artist.name.ilike(f'%{search_term}%')
+        ).outerjoin(
+            Show,
+            (Show.artist_id == Artist.id) & (Show.start_time >= now)
+        ).group_by(
+            Artist.id, Artist.name, Artist.city, Artist.state
+        ).all()
+        
+        results = [{
+            "id": artist_id,
+            "name": name,
+            "city": city,
+            "state": state,
+            "num_upcoming_shows": upcoming_shows_count,
+        } for artist_id, name, city, state, upcoming_shows_count in artist_show_counts]
         
         return {
             "count": len(results),

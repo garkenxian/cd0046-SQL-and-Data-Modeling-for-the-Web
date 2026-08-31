@@ -19,13 +19,20 @@ class ShowService():
         """Get all shows.
         
         Returns a list of all shows with venue and artist information.
+        Uses joinedload to fetch all related data in a single query.
         """
-        shows = Show.query.all()
-        results = []
+        from sqlalchemy.orm import joinedload
         
+        # Load all shows with their related venues and artists in one query
+        shows = Show.query.options(
+            joinedload(Show.venue),
+            joinedload(Show.artist)
+        ).all()
+        
+        results = []
         for show in shows:
-            venue = Venue.query.get(show.venue_id)
-            artist = Artist.query.get(show.artist_id)
+            venue = show.venue
+            artist = show.artist
             
             if not venue or not artist:
                 continue
@@ -81,9 +88,14 @@ class ShowService():
     def search_show_by_artist_and_venue(artist_id: int = None, venue_id: int = None):
         """Search shows by artist and/or venue.
         
-        Returns matching shows.
+        Returns matching shows. Uses joinedload for efficient related data fetching.
         """
-        query = Show.query
+        from sqlalchemy.orm import joinedload
+        
+        query = Show.query.options(
+            joinedload(Show.venue),
+            joinedload(Show.artist)
+        )
         
         if artist_id:
             query = query.filter_by(artist_id=artist_id)
@@ -95,8 +107,8 @@ class ShowService():
         results = []
         
         for show in shows:
-            venue = Venue.query.get(show.venue_id)
-            artist = Artist.query.get(show.artist_id)
+            venue = show.venue
+            artist = show.artist
             
             if not venue or not artist:
                 continue
